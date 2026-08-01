@@ -514,4 +514,56 @@ h.run_test("Thread buffer: omnifunc is set", function()
   cleanup_diff_buffers()
 end)
 
+h.run_test("Thread: reply separator text follows configured keys", function()
+  local config = require("gh_review.config")
+  config.reset()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+
+  thread.open_new("src/main.ts", 10, 10, "RIGHT", "")
+  local bufnr = state.get_thread_bufnr()
+  local text = table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "\n")
+  h.assert_match("Ctrl%-S to submit", text, "default renders <C-s> as Ctrl-S")
+  h.assert_match("Ctrl%-R to resolve", text)
+  h.assert_match("Ctrl%-Q to cancel", text)
+  thread.close_thread_buffer()
+
+  config.setup({ keymaps = { thread = { submit = "<leader>s", resolve = false } } })
+  thread.open_new("src/main.ts", 10, 10, "RIGHT", "")
+  bufnr = state.get_thread_bufnr()
+  text = table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "\n")
+  h.assert_match("<leader>s to submit", text, "remapped key shown verbatim")
+  h.assert_true(text:find("to resolve") == nil, "disabled action omitted from the hint")
+  h.assert_match("Reply below", text, "separator shape preserved for syntax matching")
+  thread.close_thread_buffer()
+
+  config.reset()
+end)
+
+h.run_test("Thread: keymaps honour configuration", function()
+  local config = require("gh_review.config")
+  config.reset()
+  config.setup({ keymaps = { thread = { resolve = "Z", close_insert = false } } })
+
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  thread.open_new("src/main.ts", 10, 10, "RIGHT", "")
+  local bufnr = state.get_thread_bufnr()
+
+  local function mapped(mode, lhs)
+    for _, m in ipairs(vim.api.nvim_buf_get_keymap(bufnr, mode)) do
+      if m.lhs == lhs then return m end
+    end
+    return nil
+  end
+
+  h.assert_true(mapped("n", "Z") ~= nil, "resolve remapped")
+  h.assert_true(mapped("n", "q") ~= nil, "close default intact")
+  h.assert_true(mapped("i", "<C-Q>") == nil, "close_insert disabled in insert mode")
+  h.assert_true(mapped("i", "<C-S>") ~= nil, "submit still bound in insert mode")
+
+  thread.close_thread_buffer()
+  config.reset()
+end)
+
 h.write_results("/tmp/gh_review_test_thread.txt")

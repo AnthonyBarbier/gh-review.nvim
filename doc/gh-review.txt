@@ -13,6 +13,7 @@ CONTENTS                                                  *gh-review-contents*
     8. Files List ................... |gh-review-files-list|
     9. Statusline ................... |gh-review-statusline|
    10. vim.ui Integration ........... |gh-review-vim-ui|
+   11. Configuration ................ |gh-review-config|
 
 ==============================================================================
 1. Introduction                                       *gh-review-introduction*
@@ -266,6 +267,7 @@ diff stats and thread counts: >
 Mappings:
 
 <CR>                    Open side-by-side diff for the file under cursor.
+<Space>                 Toggle the reviewed state of the file under cursor.
 q                       Close the files list.
 gf                      Close the files list (same as q).
 R                       Refresh review threads from GitHub.
@@ -301,6 +303,82 @@ automatically provide their enhanced UIs for these prompts.
 
 All keymaps include `desc` fields, making them discoverable via which-key.nvim
 and |:map|.
+
+==============================================================================
+11. Configuration                                          *gh-review-config*
+
+Calling setup() is optional.  Commands register automatically without it.
+Call it only to change keymaps or folding: >lua
+
+    require("gh_review").setup({
+      keymaps = {
+        diff  = { preview = false },
+        files = { toggle_viewed = "v" },
+      },
+      fold = { level = 99 },
+    })
+<
+Only the keys you write are changed; everything else keeps its default.
+
+An unrecognized surface, action, or value type is reported through
+|vim.notify()| and the whole setup() call is ignored, so a typo fails
+loudly rather than half-applying.
+
+KEYMAPS ~
+                                                          *gh-review-keymaps*
+
+A mapping is either a string, which remaps it, or `false`, which drops it.
+Dropping is how you free `K` for |K| / LSP hover, or `<Space>` for your
+leader key.
+
+Defaults, by surface: >lua
+
+    diff = {
+      thread_open  = "gt",
+      comment      = "gc",
+      suggestion   = "gs",
+      next_thread  = "]t",
+      prev_thread  = "[t",
+      preview      = "K",
+      toggle_files = "gf",
+      goto_file    = "gF",
+      close        = "q",
+    },
+    files = {
+      open          = "<CR>",
+      toggle_viewed = "<Space>",
+      refresh       = "R",
+      toggle_files  = "gf",
+      close         = "q",
+    },
+    thread = {
+      submit       = "<C-s>",
+      resolve      = "<C-r>",
+      close        = "q",
+      close_insert = "<C-q>",
+    },
+<
+`comment` and `suggestion` each bind both normal and visual mode.  `submit`
+and `close_insert` each bind both normal and insert mode.  You configure one
+key and every mode for it follows.
+
+The reply hint in the thread buffer names whichever keys you configured, and
+omits any action you disabled.
+
+FOLDING ~
+                                                             *gh-review-fold*
+
+    fold = { enabled = true, level = 0 }    Default: diff folds, all closed.
+    fold = { enabled = true, level = 99 }   Diff folds, all open on arrival.
+    fold = false                            No fold management at all.
+
+`fold = false` is shorthand for `fold = { enabled = false }`.
+
+|:diffthis| sets 'foldmethod' to "diff" by itself, so disabling folding means
+the plugin actively sets 'nofoldenable' once.  After that it leaves folding
+alone entirely, including declining to restore 'foldmethod' when another
+plugin changes it.  In the other two modes it does restore it, at whatever
+fold level you configured.
 
 ==============================================================================
  vim:tw=78:ts=8:ft=help:norl:

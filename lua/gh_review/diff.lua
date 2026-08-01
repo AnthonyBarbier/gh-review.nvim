@@ -2,6 +2,7 @@
 
 local state = require("gh_review.state")
 local api_mod = require("gh_review.api")
+local config = require("gh_review.config")
 
 local M = {}
 
@@ -434,6 +435,25 @@ local syntax_map = {
   mm = "objcpp",
 }
 
+-- Action declaration for diff buffers. `comment` and `suggestion` each own a
+-- normal-mode and a visual-mode mapping with different handlers. M.goto_file
+-- and M.close_diff are referenced through closures because they are defined
+-- further down the module.
+local ACTIONS = {
+  thread_open  = { { "n", open_thread_at_cursor,       "Open review thread" } },
+  comment      = { { "n", create_comment_at_cursor,    "New comment" },
+                   { "x", create_comment_visual,       "New comment (range)" } },
+  suggestion   = { { "n", create_suggestion_at_cursor, "New suggestion" },
+                   { "x", create_suggestion_visual,    "New suggestion (range)" } },
+  next_thread  = { { "n", jump_to_next_thread,         "Next review thread" } },
+  prev_thread  = { { "n", jump_to_prev_thread,         "Previous review thread" } },
+  preview      = { { "n", preview_thread_at_cursor,    "Preview thread" } },
+  toggle_files = { { "n", function() require("gh_review.files").toggle() end,
+                     "Toggle files list" } },
+  goto_file    = { { "n", function() M.goto_file() end, "Go to file (checkout only)" } },
+  close        = { { "n", function() M.close_diff() end, "Close diff" } },
+}
+
 local function setup_diff_buffer(bufnr, name, path, content, real_file)
   if real_file then
     -- Real file on disk: don't touch buftype or content
@@ -469,7 +489,7 @@ local function setup_diff_buffer(bufnr, name, path, content, real_file)
         number = vim.wo[winid].number,
       })
     end
-    vim.wo[winid].foldmethod = "diff"
+    -- foldmethod is not set here: :diffthis forces it to "diff" anyway.
     vim.wo[winid].signcolumn = "yes"
     vim.wo[winid].number = false
   end
@@ -478,17 +498,7 @@ local function setup_diff_buffer(bufnr, name, path, content, real_file)
   vim.b[bufnr].gh_review_diff = true
 
   -- Diff-buffer-local keymaps
-  vim.keymap.set("n", "gt", open_thread_at_cursor, { buffer = bufnr, silent = true, desc = "Open review thread" })
-  vim.keymap.set("n", "gc", create_comment_at_cursor, { buffer = bufnr, silent = true, desc = "New comment" })
-  vim.keymap.set("x", "gc", create_comment_visual, { buffer = bufnr, silent = true, desc = "New comment (range)" })
-  vim.keymap.set("n", "]t", jump_to_next_thread, { buffer = bufnr, silent = true, desc = "Next review thread" })
-  vim.keymap.set("n", "[t", jump_to_prev_thread, { buffer = bufnr, silent = true, desc = "Previous review thread" })
-  vim.keymap.set("n", "gs", create_suggestion_at_cursor, { buffer = bufnr, silent = true, desc = "New suggestion" })
-  vim.keymap.set("x", "gs", create_suggestion_visual, { buffer = bufnr, silent = true, desc = "New suggestion (range)" })
-  vim.keymap.set("n", "gf", function() require("gh_review.files").toggle() end, { buffer = bufnr, silent = true, desc = "Toggle files list" })
-  vim.keymap.set("n", "gF", function() M.goto_file() end, { buffer = bufnr, silent = true, desc = "Go to file (checkout only)" })
-  vim.keymap.set("n", "q", function() M.close_diff() end, { buffer = bufnr, silent = true, desc = "Close diff" })
-  vim.keymap.set("n", "K", preview_thread_at_cursor, { buffer = bufnr, silent = true, desc = "Preview thread" })
+  config.apply_keymaps(bufnr, "diff", ACTIONS)
 end
 
 local function show_diff(path, left_content, right_content)
@@ -545,15 +555,24 @@ local function show_diff(path, left_content, right_content)
   state.set_left_bufnr(left_bufnr)
   setup_diff_buffer(left_bufnr, left_name, path, left_content)
 
-  -- Enable diff mode on both -- left window first, then right
+  -- Enable diff mode on both -- left window first, then right. Fold settings
+  -- go on after :diffthis, which forces foldmethod=diff and foldlevel=0 itself.
+  local fold = config.fold_settings()
+  local function apply_fold()
+    vim.wo.foldenable = fold.foldenable
+    if fold.foldlevel ~= nil then
+      vim.wo.foldlevel = fold.foldlevel
+    end
+  end
+
   vim.cmd("wincmd p")
   vim.cmd("diffthis")
   vim.wo.wrap = true
-  vim.wo.foldlevel = 0
+  apply_fold()
   vim.cmd("wincmd p")
   vim.cmd("diffthis")
   vim.wo.wrap = true
-  vim.wo.foldlevel = 0
+  apply_fold()
 
   -- Set winbar on both diff windows
   local pr_num = state.get_pr_number()
@@ -580,6 +599,11 @@ local function show_diff(path, left_content, right_content)
   -- Workaround: Neovim fails to render syntax concealing when
   -- foldmethod=diff has closed folds.  Opening all folds, forcing
   -- a redraw, then re-closing them refreshes the conceal state.
+  -- Only folds that will actually be closed need this, and running it
+  -- otherwise would zM folds the user asked to keep open.
+  if not (fold.foldenable and fold.foldlevel == 0) then
+    return
+  end
   vim.defer_fn(function()
     for _, bid in ipairs({ left_bufnr, right_bufnr }) do
       local wid = vim.fn.bufwinid(bid)
@@ -767,12 +791,9 @@ function M.close_diff()
         vim.cmd("enew")
       else
         -- Real file buffer stays open: drop our keymaps so `q`/`K` don't shadow
-        -- macro recording / LSP hover. List mirrors setup_diff_buffer.
-        for _, key in ipairs({ "gt", "gc", "]t", "[t", "gs", "gf", "gF", "q", "K" }) do
-          pcall(vim.keymap.del, "n", key, { buffer = right })
-        end
-        pcall(vim.keymap.del, "x", "gc", { buffer = right })
-        pcall(vim.keymap.del, "x", "gs", { buffer = right })
+        -- macro recording / LSP hover. Walking ACTIONS keeps this in step with
+        -- whatever setup_diff_buffer applied, including remapped keys.
+        config.clear_keymaps(right, "diff", ACTIONS)
         -- Restore the window options the diff overrode. :diffoff leaves
         -- foldmethod as "diff" (we set it before :diffthis), and it never
         -- touches signcolumn/number, so the real file would otherwise keep

@@ -1,6 +1,7 @@
 -- Changed files list buffer.
 
 local state = require("gh_review.state")
+local config = require("gh_review.config")
 
 local M = {}
 
@@ -103,6 +104,17 @@ local function refresh_and_render()
   require("gh_review").refresh_threads()
 end
 
+-- Action declaration for the files list. Drives both keymap application and
+-- the README/help mapping tables. M.close is referenced through a closure
+-- because it is defined further down the module.
+local ACTIONS = {
+  open          = { { "n", open_file_under_cursor,      "Open diff" } },
+  toggle_viewed = { { "n", toggle_checked_under_cursor, "Toggle file reviewed" } },
+  refresh       = { { "n", refresh_and_render,          "Refresh threads" } },
+  toggle_files  = { { "n", function() M.close() end,    "Close files list" } },
+  close         = { { "n", function() M.close() end,    "Close files list" } },
+}
+
 local function setup_buffer()
   local bufnr = state.get_files_bufnr()
   vim.bo[bufnr].buftype = "nofile"
@@ -123,11 +135,7 @@ local function setup_buffer()
   vim.bo[bufnr].filetype = "gh-review-files"
 
   -- Keymaps
-  vim.keymap.set("n", "<CR>", open_file_under_cursor, { buffer = bufnr, silent = true, desc = "Open diff" })
-  vim.keymap.set("n", "<Space>", toggle_checked_under_cursor, { buffer = bufnr, silent = true, desc = "Toggle file reviewed" })
-  vim.keymap.set("n", "q", function() M.close() end, { buffer = bufnr, silent = true, desc = "Close files list" })
-  vim.keymap.set("n", "gf", function() M.close() end, { buffer = bufnr, silent = true, desc = "Close files list" })
-  vim.keymap.set("n", "R", refresh_and_render, { buffer = bufnr, silent = true, desc = "Refresh threads" })
+  config.apply_keymaps(bufnr, "files", ACTIONS)
 end
 
 function M.open()

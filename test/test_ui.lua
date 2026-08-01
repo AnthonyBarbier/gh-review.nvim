@@ -322,4 +322,38 @@ h.run_test("Files list: failed thread refresh keeps existing threads", function(
   files.close()
 end)
 
+h.run_test("Files list: keymaps honour configuration", function()
+  local config = require("gh_review.config")
+
+  -- Start from a fresh buffer. files.open() reuses an existing one, which
+  -- would still carry the mappings applied under the previous configuration --
+  -- the documented limitation of calling setup() twice mid-session.
+  local stale = vim.fn.bufnr("gh-review://files")
+  if stale ~= -1 then vim.cmd("silent! bwipeout! " .. stale) end
+
+  config.reset()
+  config.setup({ keymaps = { files = { toggle_viewed = "v", refresh = false } } })
+
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  state.set_repo_info("test-owner", "test-repo")
+  files.open()
+
+  local bufnr = state.get_files_bufnr()
+  local function mapped(mode, lhs)
+    for _, m in ipairs(vim.api.nvim_buf_get_keymap(bufnr, mode)) do
+      if m.lhs == lhs then return m end
+    end
+    return nil
+  end
+
+  h.assert_true(mapped("n", "v") ~= nil, "toggle_viewed remapped to v")
+  h.assert_true(mapped("n", " ") == nil, "default <Space> no longer mapped")
+  h.assert_true(mapped("n", "R") == nil, "refresh disabled")
+  h.assert_true(mapped("n", "q") ~= nil, "untouched default still mapped")
+
+  files.close()
+  config.reset()
+end)
+
 h.write_results("/tmp/gh_review_test_ui.txt")

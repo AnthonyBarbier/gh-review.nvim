@@ -27,6 +27,12 @@ Where they differ is in the APIs they call, not in what the user sees:
 | Async | `vim.system()` + `vim.schedule()` | `job_start()` + `timer_start(0, ...)` |
 | Omnifunc | Module-local function | Global `def g:GHReviewThreadOmnifunc()` |
 
+#### Configuration parity
+
+Configuration is Neovim-only. gh-review.nvim gained an optional `setup()` in response to [issue #5](https://github.com/gh-tui-tools/gh-review.nvim/issues/5); gh-review.vim has no equivalent. A port needs a `g:gh_review_config` dictionary using identical key names, the same three fold states, and the same single-declaration-drives-apply-and-teardown structure.
+
+Two asymmetries make it more than a transcription. gh-review.vim binds `]f` and `[f` for next/previous file and `g?` on all three surfaces for its help popup, none of which exist on the Neovim side, so it needs its own action names for them. And it currently has no keymap teardown at all, where the Neovim side must remove buffer-local mappings from checked-out real files that survive the diff.
+
 ### Dependencies
 
 The plugin uses only what Neovim 0.10 provides out of the box — no treesitter, no LSP, no picker plugins, no UI frameworks, no async libraries. The sole external dependency is the `gh` CLI. Diff buffers use `syntax=` (not `filetype=`) specifically to avoid triggering FileType autocmds that would attach LSP clients, linters, and treesitter highlighting to ephemeral review buffers. This is a deliberate choice to keep both the implementation and the user experience as minimal and straightforward as possible — just what’s needed to get the job done.
@@ -79,6 +85,7 @@ The `state.is_local_checkout()` flag controls this distinction. It is set to `tr
 plugin/gh_review.lua          Entry point: commands, highlights, fold guard
 lua/gh_review/
   init.lua                    Top-level orchestration (open, close, review lifecycle)
+  config.lua                  User configuration: defaults, validation, keymap and fold helpers
   api.lua                     Async wrapper around the gh CLI
   graphql.lua                 GraphQL query/mutation constants
   state.lua                   Centralized state management
@@ -227,11 +234,15 @@ When `is_local_checkout` is true, the right buffer is set up with:
 
 Syntax concealing (e.g., hiding markdown link URLs) works when `conceallevel` is set and the syntax file defines `conceal` rules. In practice, `foldmethod=diff` with closed folds can sometimes prevent concealing from rendering until folds are cycled.
 
-`show_diff()` works around this by deferring a fold cycle after the initial render: open all folds (`zR`), force a `redraw`, then re-close all folds (`zM`). The redraw between open and close is essential — without it, the workaround has no effect. This runs via `vim.defer_fn(..., 50)` to let the initial diff render complete first.
+`show_diff()` works around this by deferring a fold cycle after the initial render: open all folds (`zR`), force a `redraw`, then re-close all folds (`zM`). The redraw between open and close is essential — without it, the workaround has no effect. This runs via `vim.defer_fn(..., 50)` to let the initial diff render complete first. It runs only when folds will actually be closed, since with folds open or disabled there is nothing to repair and the closing `zM` would fight the user.
+
+`:diffthis` sets `foldmethod=diff` itself, along with `foldcolumn`, `scrollbind`, and `cursorbind`. The plugin therefore never sets `foldmethod`; it applies `foldenable` and `foldlevel` after `:diffthis`, which is the only point after which they persist. Disabling folding means setting `foldenable=false` — declining to set `foldmethod` would have no effect at all.
 
 #### Fold guard
 
-Plugins (LSP, linters) may asynchronously override `foldmethod` on diff buffers. A global `OptionSet` autocmd in `plugin/gh_review.lua` restores `foldmethod=diff` whenever it changes on buffers marked with `vim.b.gh_review_diff`.
+Plugins (LSP, linters) may asynchronously override `foldmethod` on diff buffers. A global `OptionSet` autocmd in `plugin/gh_review.lua` restores `foldmethod=diff` at the configured fold level whenever it changes on buffers marked with `vim.b.gh_review_diff`, and likewise restores `foldenable`. Both stand down entirely when the user has set `fold = false`: fighting for an option the user asked the plugin to leave alone is the bug, not the feature.
+
+Note that `OptionSet` does not fire during startup, and `test/run.sh` runs each suite via `nvim -c "luafile ..."`, which executes during startup. The guard tests therefore drive the registered callback with `nvim_exec_autocmds` rather than relying on automatic triggering.
 
 #### Extmarks and virtual text
 
@@ -356,6 +367,7 @@ Tests run in headless Neovim (`nvim --clean --headless`) and use a custom `run_t
 | File                  | Coverage                                              |
 |-----------------------|-------------------------------------------------------|
 | `test_state.lua`      | State setters/getters, set_pr, threads, reset, get_participants |
+| `test_config.lua`     | Config defaults, merging, validation, keymap helpers, fold modes |
 | `test_diff_logic.lua` | Extmark placement, sign types, mtime tracking         |
 | `test_ui.lua`         | Files list rendering, toggle, close, keymaps          |
 | `test_thread.lua`     | Thread buffer rendering, metadata, close, omnifunc    |

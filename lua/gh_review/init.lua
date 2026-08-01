@@ -6,6 +6,7 @@ local state = require("gh_review.state")
 local files = require("gh_review.files")
 local diff = require("gh_review.diff")
 local thread = require("gh_review.thread")
+local config = require("gh_review.config")
 
 local M = {}
 
@@ -95,6 +96,11 @@ local function fetch_merge_base(callback)
     end
     callback()
   end)
+end
+
+-- Configure the plugin. Entirely optional -- commands register automatically.
+function M.setup(opts)
+  config.setup(opts)
 end
 
 -- Open a PR for review.

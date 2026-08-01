@@ -188,16 +188,12 @@ h.run_test("Diff keymaps have desc fields", function()
   state.set_right_bufnr(right)
   state.set_diff_path("src/desc.ts")
 
-  -- Simulate what setup_diff_buffer does for keymaps
-  -- We can't call setup_diff_buffer directly, but we can test via the
-  -- actual diff module by setting up a minimal buffer with keymaps
-  local diff_mod = require("gh_review.diff")
-
-  -- Set up keymaps the same way the module does (via a real buffer setup)
-  -- For this test, we just verify existing keymaps on a buffer that went
-  -- through setup_diff_buffer would have descs. Since we can't easily
-  -- call show_diff, we verify the keymap API works with desc.
-  vim.keymap.set("n", "gt", function() end, { buffer = right, silent = true, desc = "Open review thread" })
+  -- Use the real helper so this test cannot drift from the module.
+  local config = require("gh_review.config")
+  config.reset()
+  config.apply_keymaps(right, "diff", {
+    thread_open = { { "n", function() end, "Open review thread" } },
+  })
   local maps = vim.api.nvim_buf_get_keymap(right, "n")
   local gt_map
   for _, m in ipairs(maps) do
@@ -220,8 +216,12 @@ h.run_test("Files list keymaps have desc fields", function()
   vim.bo[bufnr].buftype = "nofile"
   vim.bo[bufnr].swapfile = false
 
-  vim.keymap.set("n", "<CR>", function() end, { buffer = bufnr, silent = true, desc = "Open diff" })
-  vim.keymap.set("n", "R", function() end, { buffer = bufnr, silent = true, desc = "Refresh threads" })
+  local config = require("gh_review.config")
+  config.reset()
+  config.apply_keymaps(bufnr, "files", {
+    open    = { { "n", function() end, "Open diff" } },
+    refresh = { { "n", function() end, "Refresh threads" } },
+  })
 
   local maps = vim.api.nvim_buf_get_keymap(bufnr, "n")
   local cr_desc, r_desc
@@ -265,6 +265,76 @@ h.run_test("Thread keymaps have desc fields", function()
   thread_mod.close_thread_buffer()
   vim.cmd("bwipeout! " .. left)
   vim.cmd("bwipeout! " .. right)
+end)
+
+h.run_test("Diff: clear_keymaps removes every applied mapping", function()
+  local config = require("gh_review.config")
+  config.reset()
+  config.setup({ keymaps = { diff = { thread_open = "Z", preview = false } } })
+
+  local ACTIONS = {
+    thread_open = { { "n", function() end, "Open review thread" } },
+    comment     = { { "n", function() end, "New comment" },
+                    { "x", function() end, "New comment (range)" } },
+    preview     = { { "n", function() end, "Preview thread" } },
+  }
+  local bufnr = vim.api.nvim_create_buf(false, true)
+
+  local function count()
+    return #vim.api.nvim_buf_get_keymap(bufnr, "n") + #vim.api.nvim_buf_get_keymap(bufnr, "x")
+  end
+
+  h.assert_equal(0, count(), "buffer starts clean")
+  config.apply_keymaps(bufnr, "diff", ACTIONS)
+  h.assert_equal(3, count(), "thread_open + comment in two modes; preview skipped")
+  config.clear_keymaps(bufnr, "diff", ACTIONS)
+  h.assert_equal(0, count(), "clear removes everything apply set, at configured keys")
+
+  vim.api.nvim_buf_delete(bufnr, { force = true })
+  config.reset()
+end)
+
+h.run_test("Diff: close_diff tears down remapped keys, not hardcoded ones", function()
+  -- The teardown path that matters: on a local checkout the head buffer is a
+  -- real working-tree file that outlives the diff, so our buffer-local maps
+  -- must come off it. Teardown has to follow configuration, or a remapped key
+  -- is left shadowing whatever the user actually bound it to.
+  local config = require("gh_review.config")
+  config.reset()
+  config.setup({ keymaps = { diff = { close = "Z" } } })
+
+  state.reset()
+  local tmpfile = "/tmp/gh_review_test_teardown.lua"
+  vim.fn.writefile({ "local a = 1", "return a" }, tmpfile)
+  vim.cmd("edit " .. tmpfile)
+  local rbuf = vim.api.nvim_get_current_buf()
+
+  config.apply_keymaps(rbuf, "diff", {
+    close       = { { "n", function() end, "Close diff" } },
+    thread_open = { { "n", function() end, "Open review thread" } },
+  })
+
+  local function mapped(lhs)
+    for _, m in ipairs(vim.api.nvim_buf_get_keymap(rbuf, "n")) do
+      if m.lhs == lhs then return true end
+    end
+    return false
+  end
+
+  h.assert_true(mapped("Z"), "remapped close applied at Z")
+  h.assert_true(mapped("gt"), "default thread_open applied at gt")
+
+  state.set_right_bufnr(rbuf)
+  state.set_diff_path("gh_review_test_teardown.lua")
+  state.set_local_checkout(true)
+  diff.close_diff()
+
+  h.assert_false(mapped("Z"), "remapped close removed from the surviving real file")
+  h.assert_false(mapped("gt"), "default mapping removed too")
+
+  vim.fn.delete(tmpfile)
+  pcall(vim.cmd, "bwipeout! " .. rbuf)
+  config.reset()
 end)
 
 h.write_results("/tmp/gh_review_test_navigation.txt")

@@ -41,15 +41,20 @@ vim.api.nvim_set_hl(0, "GHReviewThreadResolved", { default = true, ctermfg = "Gr
 vim.api.nvim_set_hl(0, "GHReviewThreadPending", { default = true, ctermfg = "Yellow", fg = "#d29922" })
 vim.api.nvim_set_hl(0, "GHReviewVirtText", { default = true, ctermfg = "Gray", fg = "#8b949e", italic = true })
 
--- Fold guard for diff buffers
+-- Fold guard for diff buffers. Other plugins (LSP, linters) asynchronously
+-- override foldmethod on diff buffers; this puts it back. It stands down
+-- entirely when the user has turned fold management off, because fighting for
+-- an option they asked us to leave alone is the bug, not the feature.
 local fold_guard = vim.api.nvim_create_augroup("gh_review_fold_guard", { clear = true })
 vim.api.nvim_create_autocmd("OptionSet", {
   group = fold_guard,
   pattern = "foldmethod",
   callback = function()
+    local fold = require("gh_review.config").options.fold
+    if not fold.enabled then return end
     local bufnr = vim.api.nvim_get_current_buf()
     if vim.b[bufnr].gh_review_diff and vim.wo.foldmethod ~= "diff" then
-      vim.cmd("noautocmd setlocal foldmethod=diff foldlevel=0")
+      vim.cmd(string.format("noautocmd setlocal foldmethod=diff foldlevel=%d", fold.level))
     end
   end,
 })
@@ -57,6 +62,7 @@ vim.api.nvim_create_autocmd("OptionSet", {
   group = fold_guard,
   pattern = "foldenable",
   callback = function()
+    if not require("gh_review.config").options.fold.enabled then return end
     local bufnr = vim.api.nvim_get_current_buf()
     if vim.b[bufnr].gh_review_diff and not vim.wo.foldenable then
       vim.cmd("noautocmd setlocal foldenable")

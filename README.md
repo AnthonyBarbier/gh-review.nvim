@@ -42,7 +42,81 @@ cd ~/.local/share/nvim/site/pack/plugins/start
 git clone https://github.com/gh-tui-tools/gh-review.nvim.git
 ```
 
-No `setup()` call is required — commands register automatically.
+No `setup()` call is required — commands register automatically. Call `setup()`
+only if you want to customize keymaps or folding.
+
+## Configuration
+
+`setup()` is optional. These are the defaults:
+
+```lua
+require("gh_review").setup({
+  fold = { enabled = true, level = 0 },
+  keymaps = {
+    diff = {
+      thread_open  = "gt",
+      comment      = "gc",
+      suggestion   = "gs",
+      next_thread  = "]t",
+      prev_thread  = "[t",
+      preview      = "K",
+      toggle_files = "gf",
+      goto_file    = "gF",
+      close        = "q",
+    },
+    files = {
+      open          = "<CR>",
+      toggle_viewed = "<Space>",
+      refresh       = "R",
+      toggle_files  = "gf",
+      close         = "q",
+    },
+    thread = {
+      submit       = "<C-s>",
+      resolve      = "<C-r>",
+      close        = "q",
+      close_insert = "<C-q>",
+    },
+  },
+})
+```
+
+Write only the keys you want to change:
+
+```lua
+require("gh_review").setup({
+  keymaps = {
+    diff  = { preview = false },      -- keep K for LSP hover
+    files = { toggle_viewed = "v" },  -- keep <Space> for your leader
+  },
+  fold = { level = 99 },              -- diff folds, but open on arrival
+})
+```
+
+### Keymaps
+
+A mapping is either a string, which remaps it, or `false`, which drops it.
+Omitted keys keep their defaults. An unrecognized surface, action, or value
+type is reported through `vim.notify` and the whole `setup()` call is ignored,
+so a typo fails loudly rather than half-applying.
+
+The reply hint in the thread buffer names whichever keys you configured, and
+omits any action you disabled.
+
+### Folding
+
+| Value | Effect |
+|-------|--------|
+| `fold = { enabled = true, level = 0 }` | Default. Diff folding, everything closed. |
+| `fold = { enabled = true, level = 99 }` | Diff folding, everything open on arrival. |
+| `fold = false` | No fold management at all. |
+
+`fold = false` is shorthand for `fold = { enabled = false }`.
+
+Neovim’s `:diffthis` sets `foldmethod=diff` by itself, so disabling folding
+means the plugin actively sets `nofoldenable` once. After that it leaves
+folding alone entirely — including declining to restore `foldmethod` if
+another plugin changes it, which it does do in the other two modes.
 
 ## Workflows
 
@@ -95,6 +169,16 @@ gF                      Jump to the file with LSP (checkout only)
 | `:GHReviewSubmit`  | Submit a review (Comment / Approve / Request changes)         |
 | `:GHReviewDiscard` | Discard the pending review and all its pending comments       |
 | `:GHReviewClose`   | Close all review buffers and reset state                      |
+
+## Files list mappings
+
+| Key       | Action                                     |
+|-----------|--------------------------------------------|
+| `<CR>`    | Open the file’s side-by-side diff          |
+| `<Space>` | Toggle the file’s reviewed state           |
+| `R`       | Refresh review threads from GitHub         |
+| `gf`      | Close the files list                       |
+| `q`       | Close the files list                       |
 
 ## Diff mappings
 

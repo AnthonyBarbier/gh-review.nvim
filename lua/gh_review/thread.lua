@@ -3,10 +3,37 @@
 local state = require("gh_review.state")
 local api_mod = require("gh_review.api")
 local graphql = require("gh_review.graphql")
+local config = require("gh_review.config")
 
 local M = {}
 
-local REPLY_SEPARATOR = "── Reply below (Ctrl-S to submit, Ctrl-R to resolve, Ctrl-Q to cancel) ──"
+-- Render a configured lhs for display. <C-s> reads better as Ctrl-S, and this
+-- keeps the default separator byte-identical to what syntax/gh-review-thread.vim
+-- and the help file describe.
+local function key_hint(lhs)
+  local ctrl = lhs:match("^<[Cc]%-(.)>$")
+  if ctrl then return "Ctrl-" .. ctrl:upper() end
+  return lhs
+end
+
+-- The separator names the keys that act on the reply, so it has to follow
+-- configuration. Disabled actions are omitted rather than shown as unusable.
+-- The "── Reply below ... ──" shape is load-bearing: gh-review-thread.vim
+-- matches on it.
+local function reply_separator()
+  local km = config.options.keymaps.thread
+  local hints = {}
+  for _, pair in ipairs({ { km.submit, "submit" }, { km.resolve, "resolve" },
+                          { km.close_insert, "cancel" } }) do
+    if type(pair[1]) == "string" then
+      hints[#hints + 1] = string.format("%s to %s", key_hint(pair[1]), pair[2])
+    end
+  end
+  if #hints == 0 then
+    return "── Reply below ──"
+  end
+  return "── Reply below (" .. table.concat(hints, ", ") .. ") ──"
+end
 
 local function format_date(iso_date)
   -- "2024-01-15T10:30:00Z" -> "2024-01-15"
@@ -231,6 +258,23 @@ local function enforce_read_only()
   end
 end
 
+-- Action declaration for the thread buffer. `submit` and `close_insert` each
+-- own two mappings with different handlers: the insert-mode variants leave
+-- insert mode first. M.close_thread_buffer is referenced through a closure
+-- because it is defined further down the module.
+local ACTIONS = {
+  submit = {
+    { "n", submit_reply, "Submit reply" },
+    { "i", function() vim.cmd("stopinsert") submit_reply() end, "Submit reply" },
+  },
+  resolve = { { "n", toggle_resolve, "Toggle resolved" } },
+  close   = { { "n", function() M.close_thread_buffer() end, "Close thread" } },
+  close_insert = {
+    { "n", function() M.close_thread_buffer() end, "Close thread" },
+    { "i", function() vim.cmd("stopinsert") M.close_thread_buffer() end, "Close thread" },
+  },
+}
+
 function M.omnifunc(findstart, base)
   if findstart == 1 then
     local line = vim.fn.getline(".")
@@ -319,7 +363,7 @@ local function show_thread(t)
   end
 
   -- Reply separator
-  lines[#lines + 1] = REPLY_SEPARATOR
+  lines[#lines + 1] = reply_separator()
   lines[#lines + 1] = ""
 
   local reply_start = #lines
@@ -384,12 +428,7 @@ local function show_thread(t)
   })
 
   -- Keymaps
-  vim.keymap.set("n", "<C-s>", submit_reply, { buffer = bufnr, silent = true, desc = "Submit reply" })
-  vim.keymap.set("i", "<C-s>", function() vim.cmd("stopinsert") submit_reply() end, { buffer = bufnr, silent = true, desc = "Submit reply" })
-  vim.keymap.set("n", "<C-r>", toggle_resolve, { buffer = bufnr, silent = true, desc = "Toggle resolved" })
-  vim.keymap.set("n", "q", function() M.close_thread_buffer() end, { buffer = bufnr, silent = true, desc = "Close thread" })
-  vim.keymap.set("n", "<C-q>", function() M.close_thread_buffer() end, { buffer = bufnr, silent = true, desc = "Close thread" })
-  vim.keymap.set("i", "<C-q>", function() vim.cmd("stopinsert") M.close_thread_buffer() end, { buffer = bufnr, silent = true, desc = "Close thread" })
+  config.apply_keymaps(bufnr, "thread", ACTIONS)
 
   -- Set omnifunc for @-mention completion
   vim.bo[bufnr].omnifunc = "v:lua.require'gh_review.thread'.omnifunc"

@@ -371,4 +371,88 @@ h.run_test("close_diff restores real-file window options for local checkout", fu
   pcall(vim.cmd, "bwipeout! " .. rbuf)
 end)
 
+-- The fold guard is an OptionSet autocmd, and OptionSet never fires in this
+-- harness: run.sh runs each file via `nvim -c "luafile ..."`, which executes
+-- during startup, and OptionSet is suppressed on startup. These tests drive
+-- the real registered callback with nvim_exec_autocmds instead, which
+-- exercises the shipped code without depending on automatic triggering.
+local function fire_optionset(pattern)
+  vim.api.nvim_exec_autocmds("OptionSet", { pattern = pattern })
+end
+
+local function guard_fixture()
+  vim.cmd("tabnew")
+  local bufnr = vim.api.nvim_get_current_buf()
+  vim.bo[bufnr].buftype = "nofile"
+  vim.b[bufnr].gh_review_diff = true
+  return bufnr, vim.api.nvim_get_current_win()
+end
+
+h.run_test("Fold guard: restores foldmethod and foldenable by default", function()
+  local config = require("gh_review.config")
+  config.reset()
+  local bufnr, winid = guard_fixture()
+
+  vim.wo[winid].foldmethod = "manual"
+  fire_optionset("foldmethod")
+  h.assert_equal("diff", vim.wo[winid].foldmethod, "guard restores foldmethod")
+
+  vim.wo[winid].foldenable = false
+  fire_optionset("foldenable")
+  h.assert_true(vim.wo[winid].foldenable, "guard restores foldenable")
+
+  vim.b[bufnr].gh_review_diff = false
+  vim.cmd("tabclose!")
+  config.reset()
+end)
+
+h.run_test("Fold guard: stands down when folding is disabled", function()
+  local config = require("gh_review.config")
+  config.reset()
+  config.setup({ fold = false })
+  local bufnr, winid = guard_fixture()
+
+  vim.wo[winid].foldmethod = "manual"
+  fire_optionset("foldmethod")
+  h.assert_equal("manual", vim.wo[winid].foldmethod, "guard no longer fights foldmethod")
+
+  vim.wo[winid].foldenable = false
+  fire_optionset("foldenable")
+  h.assert_false(vim.wo[winid].foldenable, "guard no longer fights foldenable")
+
+  vim.b[bufnr].gh_review_diff = false
+  vim.cmd("tabclose!")
+  config.reset()
+end)
+
+h.run_test("Fold guard: restores the configured level, not always zero", function()
+  local config = require("gh_review.config")
+  config.reset()
+  config.setup({ fold = { level = 99 } })
+  local bufnr, winid = guard_fixture()
+
+  vim.wo[winid].foldmethod = "manual"
+  fire_optionset("foldmethod")
+  h.assert_equal("diff", vim.wo[winid].foldmethod, "guard restores foldmethod")
+  h.assert_equal(99, vim.wo[winid].foldlevel, "guard restores the configured level")
+
+  vim.b[bufnr].gh_review_diff = false
+  vim.cmd("tabclose!")
+  config.reset()
+end)
+
+h.run_test("Fold guard: ignores buffers that are not ours", function()
+  local config = require("gh_review.config")
+  config.reset()
+
+  vim.cmd("tabnew")
+  local winid = vim.api.nvim_get_current_win()
+  vim.wo[winid].foldmethod = "manual"
+  fire_optionset("foldmethod")
+  h.assert_equal("manual", vim.wo[winid].foldmethod, "no gh_review_diff flag, so untouched")
+
+  vim.cmd("tabclose!")
+  config.reset()
+end)
+
 h.write_results("/tmp/gh_review_test_diff_logic.txt")
