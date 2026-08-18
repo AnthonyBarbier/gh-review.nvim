@@ -145,16 +145,19 @@ function M.open(pr_number_str)
     return
   end
 
-  -- Determine repo and whether checkout is possible.
-  local should_checkout = false
+  -- Determine repo and whether checkout is possible. The checkout policy can
+  -- suppress or accept the prompt, but cannot make an unrelated working tree
+  -- safe to use for a cross-repository URL.
+  local repo_matches = false
   if url_owner ~= "" then
     state.set_repo_info(url_owner, url_name)
-    should_checkout = is_local_repo(url_owner, url_name)
+    repo_matches = is_local_repo(url_owner, url_name)
   else
     if not state.get_repo_info() then return end
-    should_checkout = true
+    repo_matches = true
   end
 
+  local should_checkout = config.checkout_mode(repo_matches, false) ~= "remote"
   state.set_local_checkout(should_checkout)
 
   print(string.format("Loading PR #%d...", pr_number))
@@ -190,21 +193,13 @@ function M.open(pr_number_str)
       local local_branch = state.get_head_ref()
       local obj = vim.system({ "git", "rev-parse", "--abbrev-ref", "HEAD" }, { text = true }):wait()
       local current_branch = vim.trim(obj.stdout or "")
-      if current_branch == local_branch then
+      local checkout_mode = config.checkout_mode(true, current_branch == local_branch)
+      if checkout_mode == "local" then
         load_ui()
         return
       end
 
-      vim.ui.select({ "Yes", "No" }, {
-        prompt = string.format("Check out branch %s?", local_branch),
-      }, function(choice)
-        if choice ~= "Yes" then
-          should_checkout = false
-          state.set_local_checkout(false)
-          load_ui()
-          return
-        end
-
+      local function checkout_branch()
         local fetch_ref = string.format("pull/%d/head", pr_number)
         api_mod.run_cmd_async({ "git", "fetch", "origin", fetch_ref }, function(_, fe, fetch_exit)
           if fetch_exit ~= 0 then
@@ -224,6 +219,23 @@ function M.open(pr_number_str)
             end)
           end
         end)
+      end
+
+      if checkout_mode == "checkout" then
+        checkout_branch()
+        return
+      end
+
+      vim.ui.select({ "Yes", "No" }, {
+        prompt = string.format("Check out branch %s?", local_branch),
+      }, function(choice)
+        if choice ~= "Yes" then
+          should_checkout = false
+          state.set_local_checkout(false)
+          load_ui()
+          return
+        end
+        checkout_branch()
       end)
     else
       load_ui()

@@ -6,6 +6,7 @@
 local M = {}
 
 M.defaults = {
+  checkout = "prompt",
   fold = { enabled = true, level = 0 },
   keymaps = {
     diff = {
@@ -105,6 +106,15 @@ local function validate_fold(fold)
   return ok
 end
 
+local function validate_checkout(checkout)
+  if checkout == nil then return true end
+  if checkout ~= "always" and checkout ~= "prompt" and checkout ~= "never" then
+    warn('checkout must be "always", "prompt", or "never"')
+    return false
+  end
+  return true
+end
+
 -- Accept `fold = false` as shorthand for `fold = { enabled = false }`.
 local function normalize(opts)
   opts = vim.deepcopy(opts or {})
@@ -121,16 +131,26 @@ function M.setup(opts)
 
   local ok = true
   for key in pairs(opts) do
-    if key ~= "fold" and key ~= "keymaps" then
-      warn(string.format("unknown option %q (expected fold or keymaps)", key))
+    if key ~= "checkout" and key ~= "fold" and key ~= "keymaps" then
+      warn(string.format("unknown option %q (expected checkout, fold, or keymaps)", key))
       ok = false
     end
   end
   if not validate_fold(opts.fold) then ok = false end
   if not validate_keymaps(opts.keymaps) then ok = false end
+  if not validate_checkout(opts.checkout) then ok = false end
   if not ok then return end
 
   M.options = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts)
+end
+
+-- Resolve policy separately from checkout execution so repository safety and
+-- the already-on-branch fast path have one explicit, testable decision table.
+function M.checkout_mode(repo_matches, branch_matches)
+  if not repo_matches or M.options.checkout == "never" then return "remote" end
+  if branch_matches then return "local" end
+  if M.options.checkout == "always" then return "checkout" end
+  return "prompt"
 end
 
 -- Apply a module's ACTIONS declaration to a buffer using the configured keys.

@@ -331,6 +331,7 @@ Calling setup() is optional.  Commands register automatically without it.
 Call it only to change keymaps or folding: >lua
 
     require("gh_review").setup({
+      checkout = "prompt", -- "always", "prompt", or "never"
       keymaps = {
         diff  = { preview = false },
         files = { toggle_viewed = "v" },
@@ -379,6 +380,11 @@ Defaults, by surface: >lua
       close_insert = "<C-q>",
     },
 <
+`checkout` controls reviews whose repository matches the local `origin` but
+whose PR branch is not currently checked out.  `"always"` checks out without
+asking, `"prompt"` asks first (the default), and `"never"` uses the no-checkout
+workflow.  A URL for another repository always uses the no-checkout workflow.
+
 `comment` and `suggestion` each bind both normal and visual mode.  `submit`
 and `close_insert` each bind both normal and insert mode.  You configure one
 key and every mode for it follows.

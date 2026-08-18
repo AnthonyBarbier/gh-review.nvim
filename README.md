@@ -51,6 +51,7 @@ only if you want to customize keymaps or folding.
 
 ```lua
 require("gh_review").setup({
+  checkout = "prompt", -- "always", "prompt", or "never"
   fold = { enabled = true, level = 0 },
   keymaps = {
     diff = {
@@ -113,6 +114,12 @@ omits any action you disabled.
 | `fold = false` | No fold management at all. |
 
 `fold = false` is shorthand for `fold = { enabled = false }`.
+
+`checkout` controls what happens when the PR belongs to the current repository
+but its branch is not checked out: `"always"` checks it out without asking,
+`"prompt"` keeps the confirmation (the default), and `"never"` uses the
+read-only no-checkout workflow. Cross-repository URL reviews never attempt to
+check out into an unrelated working tree.
 
 Neovim’s `:diffthis` sets `foldmethod=diff` by itself, so disabling folding
 means the plugin actively sets `nofoldenable` once. After that it leaves

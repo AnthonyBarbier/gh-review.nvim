@@ -48,6 +48,10 @@ The user is in a clone of the PR’s repo (or has already checked out the PR bra
 - If the user is already on the PR branch (detected by comparing the current branch name against the PR’s head ref), the plugin skips straight to loading the UI with no checkout prompt.
 - If the user is on a different branch but the repo matches, the plugin prompts: “Check out branch feature-x? (Y/n)”. On “Yes”, the branch is fetched via `git fetch origin pull/N/head` and checked out with `git checkout -B`. Push tracking is configured automatically (origin for same-repo PRs; a new remote for fork PRs, matching the SSH/HTTPS protocol of origin).
 - If the user declines the checkout, or the checkout fails (e.g., dirty working tree), the plugin falls back to the no-checkout workflow below.
+- `checkout = "always" | "prompt" | "never"` controls this decision when the
+  PR repository matches the local origin. The default is `"prompt"`;
+  `"always"` bypasses the confirmation and `"never"` selects the no-checkout
+  workflow. It does not override the repository-safety check for foreign URLs.
 - When checked out, the right/head diff buffer is **editable** — the user can modify files locally and save with `:w`, which writes directly to the working tree. The user can `git push` to push changes back to the PR branch.
 
 ### No-checkout workflow
