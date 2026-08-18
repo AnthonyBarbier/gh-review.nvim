@@ -164,6 +164,12 @@ end
 local function open_picker(items, callback)
   close_picker()
 
+  -- Resolve the semantic color on every open so changing colorschemes between
+  -- invocations is reflected without a plugin-specific palette or autocmd.
+  local last_reviewed_hl = vim.api.nvim_get_hl(0, { name = "DiagnosticInfo", link = false })
+  last_reviewed_hl.bold = true
+  vim.api.nvim_set_hl(0, "GHReviewLastReviewed", last_reviewed_hl)
+
   local lines = {}
   local max_width = vim.fn.strdisplaywidth("Diff changes after commit:")
   for _, item in ipairs(items) do
@@ -183,12 +189,11 @@ local function open_picker(items, callback)
     if item.last_reviewed then
       local start_col = lines[line_idx]:find("[last reviewed]", 1, true)
       if start_col then
-        -- Stack a semantic theme color with Bold instead of choosing a fixed
-        -- foreground. DiagnosticInfo is defined by virtually every theme and
-        -- remains readable across light, dark, GUI, and terminal palettes.
+        -- GHReviewLastReviewed copies the active theme's DiagnosticInfo
+        -- attributes and adds bold emphasis without hard-coding a color.
         vim.api.nvim_buf_set_extmark(picker_bufnr, picker_ns, line_idx - 1, start_col - 1, {
           end_col = start_col - 1 + #"[last reviewed]",
-          hl_group = { "DiagnosticInfo", "Bold" },
+          hl_group = "GHReviewLastReviewed",
           priority = 200,
         })
       end

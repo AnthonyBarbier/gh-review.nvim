@@ -143,8 +143,11 @@ h.run_test("Commit picker paginates and applies the selected commit-to-head rang
   h.assert_equal(1, #result.picker_extmarks)
   h.assert_equal(2, result.picker_extmarks[1][2])
   local highlight = result.picker_extmarks[1][4].hl_group
-  h.assert_equal("DiagnosticInfo", highlight[1])
-  h.assert_equal("Bold", highlight[2])
+  h.assert_equal("GHReviewLastReviewed", highlight)
+  local annotation_hl = vim.api.nvim_get_hl(0, { name = highlight, link = false })
+  local theme_hl = vim.api.nvim_get_hl(0, { name = "DiagnosticInfo", link = false })
+  h.assert_true(annotation_hl.bold, "last-reviewed annotation is bold")
+  h.assert_equal(theme_hl.fg, annotation_hl.fg, "annotation inherits theme color")
 end)
 
 h.run_test("Commit picker full-PR row restores merge base and original files", function()

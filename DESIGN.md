@@ -203,9 +203,9 @@ Files changed (3)
   diffs. The chosen commit is excluded, which models "changes since my last
   review". A separate backward-paginated review query marks the commit attached
   to the current viewer's newest submitted review. A synthetic Full PR row
-  restores the original files and merge base. The native floating picker uses
-  stacked `DiagnosticInfo` and `Bold` highlights for that annotation, deriving
-  its color from the active theme without sacrificing emphasis.
+  restores the original files and merge base. The native floating picker
+  rebuilds `GHReviewLastReviewed` from the active theme's resolved
+  `DiagnosticInfo` attributes on every open, then adds bold emphasis.
 - When the files list closes, `wincmd =` equalizes window heights, then a scroll nudge (`Ctrl-E` / `Ctrl-Y`) in each diff window forces scrollbind viewports to update.
 
 ### Side-by-side diff (`diff.lua`)
