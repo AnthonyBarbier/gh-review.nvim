@@ -167,6 +167,47 @@ M.QUERY_MY_LAST_REVIEW = [[
   }
 ]]
 
+M.QUERY_VIEWER_LOGIN = [[
+  query {
+    viewer { login }
+  }
+]]
+
+-- The author-filtered review connection classifies whether the current viewer
+-- has submitted a review without downloading every review on every open PR.
+-- Pending reviews are intentionally excluded from "previously reviewed".
+M.QUERY_OPEN_PULL_REQUESTS = [[
+  query($owner: String!, $name: String!, $viewer: String!, $cursor: String) {
+    repository(owner: $owner, name: $name) {
+      pullRequests(
+        first: 100,
+        after: $cursor,
+        states: OPEN,
+        orderBy: {field: UPDATED_AT, direction: DESC}
+      ) {
+        nodes {
+          number
+          title
+          updatedAt
+          isDraft
+          author { login }
+          reviews(
+            first: 1,
+            author: $viewer,
+            states: [APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED]
+          ) {
+            totalCount
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  }
+]]
+
 M.MUTATION_START_REVIEW = [[
   mutation($pullRequestId: ID!) {
     addPullRequestReview(input: {pullRequestId: $pullRequestId}) {

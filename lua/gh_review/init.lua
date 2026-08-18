@@ -248,6 +248,13 @@ function M.toggle_files()
   files.toggle()
 end
 
+-- Select an active PR from the current repository before entering the normal
+-- open workflow, including its configured checkout policy.
+function M.select_pr()
+  if not state.get_repo_info() then return end
+  require("gh_review.pr_select").open()
+end
+
 -- Choose a PR commit as the start of the reviewed range.  The selected commit
 -- itself is excluded, matching Git's commit..head semantics and the common
 -- "show me what changed since I last reviewed this commit" workflow.

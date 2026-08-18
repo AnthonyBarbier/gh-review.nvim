@@ -83,6 +83,7 @@ is declined or fails.
 A quick-start sequence for either workflow: >
 
     :GHReview 123           Open PR #123 (or :GHReview {url})
+    :GHReviewSelect         Pick an active PR in the current repository
     :GHReviewCommits        Optionally choose changes after a prior commit
     <CR>                    Open a file’s side-by-side diff
     ]t / [t                 Jump between review threads
@@ -108,6 +109,13 @@ A quick-start sequence for either workflow: >
 
                         See |gh-review-workflows| for details on when the
                         branch is checked out and when it is not.
+
+                                                             *:GHReviewSelect*
+:GHReviewSelect         List all active pull requests in the current
+                        repository in a floating picker.  Pull requests you
+                        previously reviewed appear first; reviewed and other
+                        groups are each sorted by most recently updated.
+                        Press <CR> to open, or q, <Esc>, or <C-c> to cancel.
 
                                                               *:GHReviewFiles*
 :GHReviewFiles          Toggle the changed files list buffer.

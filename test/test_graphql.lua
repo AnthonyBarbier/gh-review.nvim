@@ -8,6 +8,8 @@ local constants = {
   { name = "QUERY_REVIEW_THREADS", val = graphql.QUERY_REVIEW_THREADS },
   { name = "QUERY_PR_COMMITS", val = graphql.QUERY_PR_COMMITS },
   { name = "QUERY_MY_LAST_REVIEW", val = graphql.QUERY_MY_LAST_REVIEW },
+  { name = "QUERY_VIEWER_LOGIN", val = graphql.QUERY_VIEWER_LOGIN },
+  { name = "QUERY_OPEN_PULL_REQUESTS", val = graphql.QUERY_OPEN_PULL_REQUESTS },
   { name = "MUTATION_START_REVIEW", val = graphql.MUTATION_START_REVIEW },
   { name = "MUTATION_SUBMIT_REVIEW", val = graphql.MUTATION_SUBMIT_REVIEW },
   { name = "MUTATION_ADD_REVIEW_THREAD", val = graphql.MUTATION_ADD_REVIEW_THREAD },
@@ -65,6 +67,15 @@ h.run_test("QUERY_MY_LAST_REVIEW contains viewer and backward review pagination"
   h.assert_match("startCursor", q)
 end)
 
+h.run_test("QUERY_OPEN_PULL_REQUESTS filters viewer reviews and paginates", function()
+  local q = graphql.QUERY_OPEN_PULL_REQUESTS
+  h.assert_match("states: OPEN", q)
+  h.assert_match("UPDATED_AT", q)
+  h.assert_match("author: %$viewer", q)
+  h.assert_match("hasNextPage", q)
+  h.assert_match("totalCount", q)
+end)
+
 h.run_test("Mutations contain mutation keyword", function()
   h.assert_match("mutation", graphql.MUTATION_START_REVIEW)
   h.assert_match("mutation", graphql.MUTATION_SUBMIT_REVIEW)
@@ -89,6 +100,8 @@ h.run_test("Queries contain query keyword", function()
   h.assert_match("query", graphql.QUERY_REVIEW_THREADS)
   h.assert_match("query", graphql.QUERY_PR_COMMITS)
   h.assert_match("query", graphql.QUERY_MY_LAST_REVIEW)
+  h.assert_match("query", graphql.QUERY_VIEWER_LOGIN)
+  h.assert_match("query", graphql.QUERY_OPEN_PULL_REQUESTS)
 end)
 
 h.run_test("MUTATION_ADD_REVIEW_THREAD has line/side/path params", function()

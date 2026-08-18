@@ -131,6 +131,15 @@ All external commands run asynchronously via `vim.system()`:
 - **`run_async(cmd, callback)`**: prepends `"gh"` to the command. Callback receives `(stdout, stderr)`.
 - **`graphql(query, variables, callback)`**: builds the `gh api graphql` command with `-f`/`-F` flags (string vs. JSON), runs it, parses the response, checks for GraphQL errors, and calls back with the parsed table.
 
+### Active PR selection (`pr_select.lua`)
+
+`:GHReviewSelect` resolves the current viewer, then paginates through every
+open PR in the detected local repository. Each PR requests an author-filtered
+count of the viewer's submitted reviews, avoiding full review downloads.
+Reviewed and unreviewed PRs are partitioned in that order and independently
+sorted by `updatedAt` descending. Selecting a row delegates to the ordinary
+`:GHReview` path so checkout policy and review initialization remain shared.
+
 All callbacks are wrapped in `vim.schedule()` to ensure Neovim API calls run on the main thread (required by Neovim’s event loop — calling `nvim_*` functions from a `vim.system()` on_exit callback without scheduling would error).
 
 ### GraphQL queries (`graphql.lua`)
