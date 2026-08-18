@@ -149,6 +149,7 @@ When the URL refers to a different repo than the current working directory, no c
 
 ```
 :GHReview 123           Open PR #123
+:GHReviewCommits        Review only changes after a chosen PR commit
 <CR>                    Open a file’s side-by-side diff
 ]t / [t                 Jump between review threads
 gt                      View a thread
@@ -165,6 +166,7 @@ gF                      Jump to the file with LSP (checkout only)
 |--------------------|---------------------------------------------------------------|
 | `:GHReview`        | Open a PR (auto-detect, by number, or by URL)                 |
 | `:GHReviewFiles`   | Toggle the changed files list                                 |
+| `:GHReviewCommits` | Choose a commit and review only its subsequent changes; your last reviewed commit is marked |
 | `:GHReviewStart`   | Start a pending review (optional — `:GHReviewSubmit` works without it) |
 | `:GHReviewSubmit`  | Submit a review (Comment / Approve / Request changes)         |
 | `:GHReviewDiscard` | Discard the pending review and all its pending comments       |

@@ -6,6 +6,8 @@ local graphql = require("gh_review.graphql")
 local constants = {
   { name = "QUERY_PR_DETAILS", val = graphql.QUERY_PR_DETAILS },
   { name = "QUERY_REVIEW_THREADS", val = graphql.QUERY_REVIEW_THREADS },
+  { name = "QUERY_PR_COMMITS", val = graphql.QUERY_PR_COMMITS },
+  { name = "QUERY_MY_LAST_REVIEW", val = graphql.QUERY_MY_LAST_REVIEW },
   { name = "MUTATION_START_REVIEW", val = graphql.MUTATION_START_REVIEW },
   { name = "MUTATION_SUBMIT_REVIEW", val = graphql.MUTATION_SUBMIT_REVIEW },
   { name = "MUTATION_ADD_REVIEW_THREAD", val = graphql.MUTATION_ADD_REVIEW_THREAD },
@@ -16,7 +18,7 @@ local constants = {
   { name = "MUTATION_CREATE_AND_SUBMIT_REVIEW", val = graphql.MUTATION_CREATE_AND_SUBMIT_REVIEW },
 }
 
-h.run_test("All 10 GraphQL constants are strings", function()
+h.run_test("All GraphQL constants are strings", function()
   for _, c in ipairs(constants) do
     h.assert_equal("string", type(c.val), c.name .. " should be a string")
   end
@@ -44,6 +46,23 @@ h.run_test("QUERY_REVIEW_THREADS contains reviewThreads", function()
   h.assert_match("pullRequestReview", graphql.QUERY_REVIEW_THREADS)
 end)
 
+h.run_test("QUERY_PR_COMMITS contains pagination and commit metadata", function()
+  local q = graphql.QUERY_PR_COMMITS
+  h.assert_match("commits", q)
+  h.assert_match("pageInfo", q)
+  h.assert_match("endCursor", q)
+  h.assert_match("messageHeadline", q)
+end)
+
+h.run_test("QUERY_MY_LAST_REVIEW contains viewer and backward review pagination", function()
+  local q = graphql.QUERY_MY_LAST_REVIEW
+  h.assert_match("viewer", q)
+  h.assert_match("reviews", q)
+  h.assert_match("submittedAt", q)
+  h.assert_match("hasPreviousPage", q)
+  h.assert_match("startCursor", q)
+end)
+
 h.run_test("Mutations contain mutation keyword", function()
   h.assert_match("mutation", graphql.MUTATION_START_REVIEW)
   h.assert_match("mutation", graphql.MUTATION_SUBMIT_REVIEW)
@@ -57,6 +76,8 @@ end)
 h.run_test("Queries contain query keyword", function()
   h.assert_match("query", graphql.QUERY_PR_DETAILS)
   h.assert_match("query", graphql.QUERY_REVIEW_THREADS)
+  h.assert_match("query", graphql.QUERY_PR_COMMITS)
+  h.assert_match("query", graphql.QUERY_MY_LAST_REVIEW)
 end)
 
 h.run_test("MUTATION_ADD_REVIEW_THREAD has line/side/path params", function()

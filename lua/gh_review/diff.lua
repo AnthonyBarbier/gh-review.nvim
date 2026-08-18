@@ -576,7 +576,8 @@ local function show_diff(path, left_content, right_content)
 
   -- Set winbar on both diff windows
   local pr_num = state.get_pr_number()
-  local base_short = state.get_merge_base_oid()
+  local base_short = state.get_diff_base_oid()
+  if base_short == "" then base_short = state.get_merge_base_oid() end
   if base_short == "" then base_short = state.get_base_oid() end
   base_short = base_short:sub(1, 7)
   local head_short = state.get_head_oid():sub(1, 7)
@@ -672,9 +673,11 @@ end
 local function fetch_contents(base_oid, head_oid, path)
   -- Determine change type for this file
   local change_type = "MODIFIED"
+  local base_path = path
   for _, f in ipairs(state.get_changed_files()) do
     if f.path == path then
       change_type = state.get(f, "changeType", "MODIFIED")
+      base_path = state.get(f, "previousPath", path)
       break
     end
   end
@@ -698,7 +701,7 @@ local function fetch_contents(base_oid, head_oid, path)
     left_content = {}
     fetches_done = fetches_done + 1
   else
-    fetch_git_content(base_oid, path, function(content)
+    fetch_git_content(base_oid, base_path, function(content)
       left_content = content
       handle_done()
     end)
@@ -725,7 +728,10 @@ end
 function M.open(path)
   state.set_diff_path(path)
 
-  local base_oid = state.get_merge_base_oid()
+  local base_oid = state.get_diff_base_oid()
+  if base_oid == "" then
+    base_oid = state.get_merge_base_oid()
+  end
   if base_oid == "" then
     base_oid = state.get_base_oid()
   end

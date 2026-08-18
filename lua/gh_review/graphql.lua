@@ -113,6 +113,60 @@ M.QUERY_REVIEW_THREADS = [[
   }
 ]]
 
+-- Commits are fetched only when the commit picker is opened.  Keeping this
+-- paginated query separate from QUERY_PR_DETAILS avoids slowing down the
+-- normal review startup, while still allowing PRs with more than 100 commits
+-- to be listed completely.
+M.QUERY_PR_COMMITS = [[
+  query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        commits(first: 100, after: $cursor) {
+          nodes {
+            commit {
+              oid
+              messageHeadline
+              committedDate
+              author {
+                name
+                user { login }
+              }
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+    }
+  }
+]]
+
+-- GitHub does not expose a direct "my last review" field.  Fetch review pages
+-- newest-first and let commits.lua stop at the first submitted review authored
+-- by the current viewer.  Backward pagination handles PRs with many reviews.
+M.QUERY_MY_LAST_REVIEW = [[
+  query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+    viewer { login }
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        reviews(last: 100, before: $cursor) {
+          nodes {
+            author { login }
+            submittedAt
+            commit { oid }
+          }
+          pageInfo {
+            hasPreviousPage
+            startCursor
+          }
+        }
+      }
+    }
+  }
+]]
+
 M.MUTATION_START_REVIEW = [[
   mutation($pullRequestId: ID!) {
     addPullRequestReview(input: {pullRequestId: $pullRequestId}) {

@@ -31,6 +31,10 @@ local head_oid = ""
 local head_repo_owner = ""
 local head_repo_name = ""
 local merge_base_oid = ""
+-- The comparison base normally equals merge_base_oid, but can be moved to a
+-- PR commit so a reviewer sees only changes made after an earlier review.
+-- Keeping both values makes the full-PR selection lossless.
+local diff_base_oid = ""
 
 -- Repo info
 local repo_owner = ""
@@ -38,6 +42,7 @@ local repo_name = ""
 
 -- Changed files: list of tables with path, additions, deletions, changeType
 local changed_files = {}
+local full_pr_files = {}
 
 -- Set of file paths marked as reviewed
 local checked_files = {}
@@ -78,11 +83,15 @@ function M.get_head_repo_name() return head_repo_name end
 
 function M.get_merge_base_oid() return merge_base_oid end
 function M.set_merge_base_oid(oid) merge_base_oid = oid end
+function M.get_diff_base_oid() return diff_base_oid end
+function M.set_diff_base_oid(oid) diff_base_oid = oid end
 
 function M.get_owner() return repo_owner end
 function M.get_name() return repo_name end
 
 function M.get_changed_files() return changed_files end
+function M.set_changed_files(files) changed_files = files end
+function M.restore_full_pr_files() changed_files = full_pr_files end
 
 function M.is_file_checked(path) return checked_files[path] or false end
 function M.set_file_checked(path, checked)
@@ -123,6 +132,11 @@ function M.set_saved_win_opts(opts) saved_win_opts = opts end
 
 function M.set_pr(data)
   local pr = data.data.repository.pullRequest
+  -- A new PR must not inherit a custom range or resolved merge base from the
+  -- previously opened review. fetch_merge_base() repopulates both after this
+  -- metadata has been installed.
+  merge_base_oid = ""
+  diff_base_oid = ""
   pr_id = pr.id
   pr_number = pr.number
   pr_title = pr.title
@@ -138,6 +152,7 @@ function M.set_pr(data)
   end
 
   changed_files = pr.files.nodes
+  full_pr_files = changed_files
 
   checked_files = {}
   for _, f in ipairs(changed_files) do
@@ -256,9 +271,11 @@ function M.reset()
   head_repo_owner = ""
   head_repo_name = ""
   merge_base_oid = ""
+  diff_base_oid = ""
   repo_owner = ""
   repo_name = ""
   changed_files = {}
+  full_pr_files = {}
   checked_files = {}
   threads = {}
   pending_review_id = ""

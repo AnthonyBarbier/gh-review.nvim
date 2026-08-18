@@ -83,6 +83,7 @@ is declined or fails.
 A quick-start sequence for either workflow: >
 
     :GHReview 123           Open PR #123 (or :GHReview {url})
+    :GHReviewCommits        Optionally choose changes after a prior commit
     <CR>                    Open a file’s side-by-side diff
     ]t / [t                 Jump between review threads
     gt                      View a thread
@@ -111,6 +112,15 @@ A quick-start sequence for either workflow: >
                                                               *:GHReviewFiles*
 :GHReviewFiles          Toggle the changed files list buffer.
 
+                                                            *:GHReviewCommits*
+:GHReviewCommits        List every commit in the current PR and choose the
+                        start of the diff range.  Selecting a commit shows
+                        changes after that commit through the PR head and
+                        filters the files list to the same range.  Select
+                        "Full PR" to restore the merge-base-to-head range.
+                        The commit associated with your most recently
+                        submitted review is annotated as "last reviewed".
+
                                                               *:GHReviewStart*
 :GHReviewStart          Start a pending review.  All subsequent comments will
                         be held as pending until the review is submitted.
@@ -137,7 +147,8 @@ A quick-start sequence for either workflow: >
 5. Diff View                                             *gh-review-diff-view*
 
 The diff view shows two vertically split buffers in Neovim’s native diff mode:
-the left buffer shows the base version (at the merge base commit) and the
+the left buffer shows the base version (at the merge base commit, or at the
+commit selected with |:GHReviewCommits|) and the
 right buffer shows the head version (at the PR’s head commit).
 
 In the checkout workflow, the right buffer is editable.  |:w| writes to the

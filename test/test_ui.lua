@@ -116,6 +116,18 @@ h.run_test("Files list: Rerender updates content", function()
   files.close()
 end)
 
+h.run_test("Files list: selected commit range is visible in the header", function()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  state.set_merge_base_oid("merge000")
+  state.set_diff_base_oid("selected123456")
+  files.open()
+
+  local lines = vim.api.nvim_buf_get_lines(state.get_files_bufnr(), 0, -1, false)
+  h.assert_match("Files changed after selected", lines[2])
+  files.close()
+end)
+
 h.run_test("Files list: Close expands diff windows into freed space", function()
   state.reset()
   state.set_pr(fixtures.mock_pr_data())

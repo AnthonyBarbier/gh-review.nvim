@@ -23,7 +23,14 @@ local function render()
   local pr_number = state.get_pr_number()
   local pr_url = string.format("https://github.com/%s/%s/pull/%d", state.get_owner(), state.get_name(), pr_number)
   lines[#lines + 1] = string.format("%s: %s", pr_url, pr_title)
-  lines[#lines + 1] = string.format("Files changed (%d)", #files)
+  local diff_base = state.get_diff_base_oid()
+  if diff_base ~= "" and diff_base ~= state.get_merge_base_oid() then
+    -- Keep the range context in the existing header row so cursor-to-file
+    -- indexing remains stable while making a filtered review unmistakable.
+    lines[#lines + 1] = string.format("Files changed after %s (%d)", diff_base:sub(1, 8), #files)
+  else
+    lines[#lines + 1] = string.format("Files changed (%d)", #files)
+  end
   lines[#lines + 1] = ""
 
   for _, f in ipairs(files) do

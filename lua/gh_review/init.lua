@@ -73,6 +73,7 @@ local function fetch_merge_base(callback)
 
   if obj.code == 0 and vim.trim(obj.stdout or "") ~= "" then
     state.set_merge_base_oid(vim.trim(obj.stdout))
+    state.set_diff_base_oid(vim.trim(obj.stdout))
     callback()
     return
   end
@@ -94,6 +95,7 @@ local function fetch_merge_base(callback)
       vim.notify("[gh-review] Could not determine merge base; diff may be inaccurate", vim.log.levels.WARN)
       state.set_merge_base_oid(state.get_base_oid())
     end
+    state.set_diff_base_oid(state.get_merge_base_oid())
     callback()
   end)
 end
@@ -232,6 +234,13 @@ end
 -- Toggle the files list.
 function M.toggle_files()
   files.toggle()
+end
+
+-- Choose a PR commit as the start of the reviewed range.  The selected commit
+-- itself is excluded, matching Git's commit..head semantics and the common
+-- "show me what changed since I last reviewed this commit" workflow.
+function M.choose_commit()
+  require("gh_review.commits").choose()
 end
 
 -- Start a pending review.

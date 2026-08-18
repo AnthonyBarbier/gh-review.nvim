@@ -104,6 +104,9 @@ All plugin state lives in module-local variables in `state.lua`, accessed throug
 - **PR metadata**: id, number, title, state, base/head refs and OIDs, head repository owner/name (guarded against `vim.NIL` for deleted forks), merge base OID.
 - **Repo info**: owner and name, detected from `git remote get-url origin` or provided via URL argument.
 - **Changed files**: list of tables with path, additions, deletions, changeType.
+- **Diff range**: the resolved merge base is retained separately from the active
+  diff base. `:GHReviewCommits` can move the active base to a PR commit and can
+  therefore restore the exact full-PR range without another metadata request.
 - **Review threads**: indexed by thread ID in a table. Threads are the central data structure — they drive sign placement, files list thread counts, and the thread buffer content.
 - **Buffer/window IDs**: files list, left diff, right diff, thread buffer and window.
 - **UI state**: current diff path, local checkout flag, pending review ID.
@@ -194,6 +197,13 @@ Files changed (3)
 - `<CR>` opens the side-by-side diff for the file under the cursor.
 - `R` refreshes threads from GitHub and rerenders.
 - `q` / `gf` closes the files list.
+- `:GHReviewCommits` fetches the complete, paginated PR commit list on demand.
+  Choosing commit X compares `X...head` through GitHub's compare API, updates
+  the files list from that response, and uses X as the left side of subsequent
+  diffs. The chosen commit is excluded, which models "changes since my last
+  review". A separate backward-paginated review query marks the commit attached
+  to the current viewer's newest submitted review. A synthetic Full PR row
+  restores the original files and merge base.
 - When the files list closes, `wincmd =` equalizes window heights, then a scroll nudge (`Ctrl-E` / `Ctrl-Y`) in each diff window forces scrollbind viewports to update.
 
 ### Side-by-side diff (`diff.lua`)

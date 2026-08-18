@@ -35,6 +35,17 @@ h.run_test("SetPR loads changed files", function()
   h.assert_equal("DELETED", files[3].changeType)
 end)
 
+h.run_test("Changed files can be filtered and restored to the full PR", function()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+
+  state.set_changed_files({ { path = "src/later.ts", changeType = "ADDED" } })
+  h.assert_equal("src/later.ts", state.get_changed_files()[1].path)
+  state.restore_full_pr_files()
+  h.assert_equal(3, #state.get_changed_files())
+  h.assert_equal("src/new_file.ts", state.get_changed_files()[1].path)
+end)
+
 h.run_test("SetPR detects pending review", function()
   state.reset()
   state.set_pr(fixtures.mock_pr_data())
