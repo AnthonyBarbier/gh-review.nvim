@@ -89,17 +89,25 @@ local function load_with_mocks(select_index)
   }
   package.loaded["gh_review.commits"] = nil
 
-  local old_select = vim.ui.select
-  vim.ui.select = function(items, opts, callback)
-    -- The reset row stays first and commits are shown newest-first.
-    h.assert_equal("Full PR (merge base .. head)", opts.format_item(items[1]))
-    h.assert_match("22222222", opts.format_item(items[2]))
-    h.assert_false(opts.format_item(items[2]):find("last reviewed", 1, true) ~= nil)
-    h.assert_match("last reviewed", opts.format_item(items[3]))
-    callback(items[select_index])
-  end
   require("gh_review.commits").choose()
-  vim.ui.select = old_select
+
+  local picker_winid = vim.api.nvim_get_current_win()
+  local picker_bufnr = vim.api.nvim_get_current_buf()
+  local picker_lines = vim.api.nvim_buf_get_lines(picker_bufnr, 0, -1, false)
+  local picker_extmarks = vim.api.nvim_buf_get_extmarks(picker_bufnr, -1, 0, -1, { details = true })
+  -- The reset row stays first, commits are newest-first, and only the viewer's
+  -- last reviewed commit carries the annotation highlight.
+  h.assert_equal("Full PR (merge base .. head)", picker_lines[1])
+  h.assert_match("22222222", picker_lines[2])
+  h.assert_false(picker_lines[2]:find("last reviewed", 1, true) ~= nil)
+  h.assert_match("last reviewed", picker_lines[3])
+  h.assert_equal("gh-review-commits", vim.bo[picker_bufnr].filetype)
+  h.assert_true(vim.wo[picker_winid].cursorline)
+
+  vim.api.nvim_win_set_cursor(picker_winid, { select_index, 0 })
+  local enter_map = vim.fn.maparg("<CR>", "n", false, true)
+  h.assert_equal("function", type(enter_map.callback))
+  enter_map.callback()
 
   return {
     graphql_calls = graphql_calls,
@@ -107,6 +115,9 @@ local function load_with_mocks(select_index)
     compare_endpoint = compare_endpoint,
     close_count = close_count,
     rerender_count = rerender_count,
+    picker_lines = picker_lines,
+    picker_extmarks = picker_extmarks,
+    picker_closed = not vim.api.nvim_win_is_valid(picker_winid),
   }
 end
 
@@ -128,6 +139,12 @@ h.run_test("Commit picker paginates and applies the selected commit-to-head rang
   h.assert_equal("src/old-name.lua", state.get_changed_files()[3].previousPath)
   h.assert_equal(1, result.close_count)
   h.assert_equal(1, result.rerender_count)
+  h.assert_true(result.picker_closed)
+  h.assert_equal(1, #result.picker_extmarks)
+  h.assert_equal(2, result.picker_extmarks[1][2])
+  local highlight = result.picker_extmarks[1][4].hl_group
+  h.assert_equal("DiagnosticInfo", highlight[1])
+  h.assert_equal("Bold", highlight[2])
 end)
 
 h.run_test("Commit picker full-PR row restores merge base and original files", function()

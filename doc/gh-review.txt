@@ -119,7 +119,9 @@ A quick-start sequence for either workflow: >
                         filters the files list to the same range.  Select
                         "Full PR" to restore the merge-base-to-head range.
                         The commit associated with your most recently
-                        submitted review is annotated as "last reviewed".
+                        submitted review is annotated as "last reviewed" in
+                        a theme-derived bold color.  In the picker, press
+                        <CR> to select or q, <Esc>, or <C-c> to cancel.
 
                                                               *:GHReviewStart*
 :GHReviewStart          Start a pending review.  All subsequent comments will

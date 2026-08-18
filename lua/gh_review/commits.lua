@@ -5,6 +5,9 @@ local graphql = require("gh_review.graphql")
 local state = require("gh_review.state")
 
 local M = {}
+local picker_ns = vim.api.nvim_create_namespace("gh_review_commits")
+local picker_bufnr = -1
+local picker_winid = -1
 
 -- GitHub's compare response uses REST status names, while the rest of the
 -- plugin consumes GraphQL-style changeType values.  Diff rendering only needs
@@ -137,10 +140,91 @@ local function format_commit(item)
   if item.full_pr then return "Full PR (merge base .. head)" end
   local commit = item.commit
   local date = state.get(commit, "committedDate", ""):sub(1, 10)
-  local annotation = item.last_reviewed and "  [last reviewed]" or ""
-  return string.format("%s  %s  %-16s  %s%s",
-    state.get(commit, "oid", ""):sub(1, 8), date, author_name(commit),
-    state.get(commit, "messageHeadline", ""), annotation)
+  local annotation = item.last_reviewed and "[last reviewed]" or ""
+  -- Keep the marker beside the OID so it remains visible when a long subject
+  -- extends past the floating window's available width.
+  return string.format("%s  %-15s  %s  %-16s  %s",
+    state.get(commit, "oid", ""):sub(1, 8), annotation, date,
+    author_name(commit), state.get(commit, "messageHeadline", ""))
+end
+
+local function close_picker()
+  local winid = picker_winid
+  local bufnr = picker_bufnr
+  picker_winid = -1
+  picker_bufnr = -1
+  if winid ~= -1 and vim.api.nvim_win_is_valid(winid) then
+    vim.api.nvim_win_close(winid, true)
+  end
+  if bufnr ~= -1 and vim.api.nvim_buf_is_valid(bufnr) then
+    vim.api.nvim_buf_delete(bufnr, { force = true })
+  end
+end
+
+local function open_picker(items, callback)
+  close_picker()
+
+  local lines = {}
+  local max_width = vim.fn.strdisplaywidth("Diff changes after commit:")
+  for _, item in ipairs(items) do
+    local line = format_commit(item)
+    lines[#lines + 1] = line
+    max_width = math.max(max_width, vim.fn.strdisplaywidth(line))
+  end
+
+  picker_bufnr = vim.api.nvim_create_buf(false, true)
+  vim.bo[picker_bufnr].buftype = "nofile"
+  vim.bo[picker_bufnr].bufhidden = "wipe"
+  vim.bo[picker_bufnr].swapfile = false
+  vim.bo[picker_bufnr].filetype = "gh-review-commits"
+  vim.api.nvim_buf_set_lines(picker_bufnr, 0, -1, false, lines)
+
+  for line_idx, item in ipairs(items) do
+    if item.last_reviewed then
+      local start_col = lines[line_idx]:find("[last reviewed]", 1, true)
+      if start_col then
+        -- Stack a semantic theme color with Bold instead of choosing a fixed
+        -- foreground. DiagnosticInfo is defined by virtually every theme and
+        -- remains readable across light, dark, GUI, and terminal palettes.
+        vim.api.nvim_buf_set_extmark(picker_bufnr, picker_ns, line_idx - 1, start_col - 1, {
+          end_col = start_col - 1 + #"[last reviewed]",
+          hl_group = { "DiagnosticInfo", "Bold" },
+          priority = 200,
+        })
+      end
+    end
+  end
+  vim.bo[picker_bufnr].modifiable = false
+
+  local width = math.min(max_width, math.max(1, vim.o.columns - 4))
+  local height = math.min(#lines, math.max(1, vim.o.lines - 4))
+  picker_winid = vim.api.nvim_open_win(picker_bufnr, true, {
+    relative = "editor",
+    row = math.max(0, math.floor((vim.o.lines - height) / 2) - 1),
+    col = math.max(0, math.floor((vim.o.columns - width) / 2)),
+    width = width,
+    height = height,
+    style = "minimal",
+    border = "rounded",
+    title = " Diff changes after commit ",
+    title_pos = "center",
+  })
+  vim.wo[picker_winid].cursorline = true
+  vim.wo[picker_winid].wrap = false
+
+  local function choose_current()
+    local choice = items[vim.api.nvim_win_get_cursor(picker_winid)[1]]
+    close_picker()
+    callback(choice)
+  end
+  local function cancel()
+    close_picker()
+  end
+  local map_opts = { buffer = picker_bufnr, silent = true, nowait = true }
+  vim.keymap.set("n", "<CR>", choose_current, map_opts)
+  vim.keymap.set("n", "q", cancel, map_opts)
+  vim.keymap.set("n", "<Esc>", cancel, map_opts)
+  vim.keymap.set("n", "<C-c>", cancel, map_opts)
 end
 
 local function apply_range(base_oid, changed_files, full_pr)
@@ -167,10 +251,7 @@ local function select_commit(commits, last_reviewed_oid)
     }
   end
 
-  vim.ui.select(items, {
-    prompt = "Diff changes after commit:",
-    format_item = format_commit,
-  }, function(choice)
+  open_picker(items, function(choice)
     if not choice then return end
     if choice.full_pr then
       apply_range(state.get_merge_base_oid(), nil, true)
