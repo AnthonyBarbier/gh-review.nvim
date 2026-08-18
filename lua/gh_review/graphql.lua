@@ -227,6 +227,7 @@ M.MUTATION_ADD_REVIEW_THREAD = [[
               login
             }
             createdAt
+            pullRequestReview { id state }
           }
         }
       }
@@ -249,6 +250,31 @@ M.MUTATION_ADD_REVIEW_COMMENT = [[
         }
         createdAt
       }
+    }
+  }
+]]
+
+M.MUTATION_UPDATE_REVIEW_COMMENT = [[
+  mutation($commentId: ID!, $body: String!) {
+    updatePullRequestReviewComment(input: {
+      pullRequestReviewCommentId: $commentId,
+      body: $body
+    }) {
+      pullRequestReviewComment {
+        id
+        body
+        author { login }
+        createdAt
+        pullRequestReview { id state }
+      }
+    }
+  }
+]]
+
+M.MUTATION_DELETE_REVIEW_COMMENT = [[
+  mutation($commentId: ID!) {
+    deletePullRequestReviewComment(input: {id: $commentId}) {
+      pullRequestReviewComment { id }
     }
   }
 ]]

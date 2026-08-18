@@ -74,6 +74,7 @@ require("gh_review").setup({
     thread = {
       submit       = "<C-s>",
       resolve      = "<C-r>",
+      delete_comment = "<C-d>",
       close        = "q",
       close_insert = "<C-q>",
     },
@@ -202,6 +203,7 @@ gF                      Jump to the file with LSP (checkout only)
 |----------|-----------------------------------------------|
 | `Ctrl-S` | Submit the reply                              |
 | `Ctrl-R` | Toggle resolved/unresolved                    |
+| `Ctrl-D` | Delete the pending comment being edited       |
 | `q`      | Close the thread buffer                       |
 | `Ctrl-Q` | Close the thread buffer (works in insert mode)|
 | `Ctrl-X Ctrl-O` | Complete `@`-mention from thread participants |
@@ -217,6 +219,11 @@ gF                      Jump to the file with LSP (checkout only)
 Each sign is accompanied by virtual text at end-of-line showing the first comment’s author and a truncated body — giving at-a-glance context without opening the thread.
 
 Comment reactions are displayed as emoji with counts after each comment body in the thread buffer and floating preview.
+
+Comments saved in the active pending review are editable. Opening a thread
+loads its pending comment into the reply area; if the thread has several,
+you are prompted to choose one. Change the text and use `Ctrl-S` or `:w` to
+update it. Use `Ctrl-D` in normal mode to delete it after confirmation.
 
 ## `vim.ui` integration
 

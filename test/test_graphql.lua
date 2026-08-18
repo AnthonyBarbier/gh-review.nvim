@@ -12,6 +12,8 @@ local constants = {
   { name = "MUTATION_SUBMIT_REVIEW", val = graphql.MUTATION_SUBMIT_REVIEW },
   { name = "MUTATION_ADD_REVIEW_THREAD", val = graphql.MUTATION_ADD_REVIEW_THREAD },
   { name = "MUTATION_ADD_REVIEW_COMMENT", val = graphql.MUTATION_ADD_REVIEW_COMMENT },
+  { name = "MUTATION_UPDATE_REVIEW_COMMENT", val = graphql.MUTATION_UPDATE_REVIEW_COMMENT },
+  { name = "MUTATION_DELETE_REVIEW_COMMENT", val = graphql.MUTATION_DELETE_REVIEW_COMMENT },
   { name = "MUTATION_RESOLVE_THREAD", val = graphql.MUTATION_RESOLVE_THREAD },
   { name = "MUTATION_UNRESOLVE_THREAD", val = graphql.MUTATION_UNRESOLVE_THREAD },
   { name = "MUTATION_DELETE_REVIEW", val = graphql.MUTATION_DELETE_REVIEW },
@@ -68,9 +70,18 @@ h.run_test("Mutations contain mutation keyword", function()
   h.assert_match("mutation", graphql.MUTATION_SUBMIT_REVIEW)
   h.assert_match("mutation", graphql.MUTATION_ADD_REVIEW_THREAD)
   h.assert_match("mutation", graphql.MUTATION_ADD_REVIEW_COMMENT)
+  h.assert_match("mutation", graphql.MUTATION_UPDATE_REVIEW_COMMENT)
+  h.assert_match("mutation", graphql.MUTATION_DELETE_REVIEW_COMMENT)
   h.assert_match("mutation", graphql.MUTATION_RESOLVE_THREAD)
   h.assert_match("mutation", graphql.MUTATION_UNRESOLVE_THREAD)
   h.assert_match("mutation", graphql.MUTATION_CREATE_AND_SUBMIT_REVIEW)
+end)
+
+h.run_test("Pending comment mutations target a review comment ID", function()
+  h.assert_match("pullRequestReviewCommentId", graphql.MUTATION_UPDATE_REVIEW_COMMENT)
+  h.assert_match("%$body", graphql.MUTATION_UPDATE_REVIEW_COMMENT)
+  h.assert_match("deletePullRequestReviewComment", graphql.MUTATION_DELETE_REVIEW_COMMENT)
+  h.assert_match("id: %$commentId", graphql.MUTATION_DELETE_REVIEW_COMMENT)
 end)
 
 h.run_test("Queries contain query keyword", function()

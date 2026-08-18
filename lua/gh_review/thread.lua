@@ -7,6 +7,11 @@ local config = require("gh_review.config")
 
 local M = {}
 
+local function format_date(iso_date)
+  -- "2024-01-15T10:30:00Z" -> "2024-01-15"
+  return (iso_date:gsub("T.*", ""))
+end
+
 -- Render a configured lhs for display. <C-s> reads better as Ctrl-S, and this
 -- keeps the default separator byte-identical to what syntax/gh-review-thread.vim
 -- and the help file describe.
@@ -20,11 +25,18 @@ end
 -- configuration. Disabled actions are omitted rather than shown as unusable.
 -- The "── Reply below ... ──" shape is load-bearing: gh-review-thread.vim
 -- matches on it.
-local function reply_separator()
+local function reply_separator(is_editing)
   local km = config.options.keymaps.thread
   local hints = {}
-  for _, pair in ipairs({ { km.submit, "submit" }, { km.resolve, "resolve" },
-                          { km.close_insert, "cancel" } }) do
+  local actions = {
+    { km.submit, is_editing and "save" or "submit" },
+    { km.resolve, "resolve" },
+    { km.close_insert, "cancel" },
+  }
+  if is_editing then
+    actions[#actions + 1] = { km.delete_comment, "delete comment" }
+  end
+  for _, pair in ipairs(actions) do
     if type(pair[1]) == "string" then
       hints[#hints + 1] = string.format("%s to %s", key_hint(pair[1]), pair[2])
     end
@@ -35,9 +47,36 @@ local function reply_separator()
   return "── Reply below (" .. table.concat(hints, ", ") .. ") ──"
 end
 
-local function format_date(iso_date)
-  -- "2024-01-15T10:30:00Z" -> "2024-01-15"
-  return (iso_date:gsub("T.*", ""))
+local function pending_comments(t)
+  if not state.is_review_active() then return {} end
+  local result = {}
+  local comments = state.get(state.get(t, "comments", {}), "nodes", {})
+  for _, comment in ipairs(comments) do
+    local review = state.get(comment, "pullRequestReview", {})
+    if state.get(review, "id", "") == state.get_pending_review_id()
+        and state.get(review, "state", "") == "PENDING" then
+      result[#result + 1] = comment
+    end
+  end
+  return result
+end
+
+local function format_pending_comment(comment)
+  local body = state.get(comment, "body", ""):gsub("\n.*", "")
+  if #body > 60 then body = body:sub(1, 57) .. "..." end
+  return string.format("%s  %s", format_date(state.get(comment, "createdAt", "")), body)
+end
+
+local function choose_pending_comment(comments, prompt, callback)
+  if #comments == 0 then
+    callback(nil)
+  elseif #comments == 1 then
+    callback(comments[1])
+  else
+    -- Multiple draft replies can belong to one thread.  Make the target
+    -- explicit rather than guessing which saved comment the user meant.
+    vim.ui.select(comments, { prompt = prompt, format_item = format_pending_comment }, callback)
+  end
 end
 
 local REACTION_EMOJI = {
@@ -144,6 +183,45 @@ local function submit_review_reply(body, bufnr)
   end)
 end
 
+local function update_pending_comment(body, bufnr)
+  local comment_id = vim.b[bufnr].gh_review_edit_comment_id or ""
+  local original_body = vim.b[bufnr].gh_review_edit_original_body or ""
+  if body == original_body then
+    print("Pending comment is unchanged")
+    return
+  end
+  if body == "" then
+    vim.notify("[gh-review] A comment cannot be empty; use Ctrl-D to delete it", vim.log.levels.ERROR)
+    return
+  end
+
+  print("Updating pending comment...")
+  local thread_id = vim.b[bufnr].gh_review_thread_id or ""
+  api_mod.graphql(graphql.MUTATION_UPDATE_REVIEW_COMMENT, {
+    commentId = comment_id,
+    body = body,
+  }, function(result)
+    local updated = ((((result or {}).data or {}).updatePullRequestReviewComment or {}).pullRequestReviewComment or {})
+    if not updated.id then
+      vim.notify("[gh-review] Failed to update pending comment", vim.log.levels.ERROR)
+      return
+    end
+    local t = state.get_thread(thread_id)
+    local comments = state.get(state.get(t, "comments", {}), "nodes", {})
+    for _, comment in ipairs(comments) do
+      if comment.id == updated.id then
+        -- Preserve fields omitted by the mutation (for example reactions)
+        -- while installing the authoritative body returned by GitHub.
+        for key, value in pairs(updated) do comment[key] = value end
+        break
+      end
+    end
+    require("gh_review.diff").refresh_signs()
+    print("Pending comment updated")
+    if state.get_thread_bufnr() == bufnr then M.close_thread_buffer() end
+  end)
+end
+
 local function submit_reply_via_graphql(body, in_reply_to)
   local start_vars = { pullRequestId = state.get_pr_id() }
   api_mod.graphql(graphql.MUTATION_START_REVIEW, start_vars, function(result)
@@ -200,6 +278,11 @@ local function submit_reply()
   if bufnr == -1 then return end
   local reply_start = vim.b[bufnr].gh_review_reply_start or -1
   local body = get_reply_text(bufnr, reply_start)
+  local edit_comment_id = vim.b[bufnr].gh_review_edit_comment_id or ""
+  if edit_comment_id ~= "" then
+    update_pending_comment(body, bufnr)
+    return
+  end
   if body == "" then
     print("No reply text to submit")
     return
@@ -214,6 +297,52 @@ local function submit_reply()
     submit_review_reply(body, bufnr)
   else
     submit_standalone_reply(body, bufnr)
+  end
+end
+
+
+local function delete_pending_comment()
+  local bufnr = state.get_thread_bufnr()
+  if bufnr == -1 then return end
+  local thread_id = vim.b[bufnr].gh_review_thread_id or ""
+  local candidates = pending_comments(state.get_thread(thread_id))
+  local selected_id = vim.b[bufnr].gh_review_edit_comment_id or ""
+  local selected
+  for _, comment in ipairs(candidates) do
+    if comment.id == selected_id then selected = comment break end
+  end
+
+  local function confirm_delete(comment)
+    if not comment then
+      vim.notify("[gh-review] This thread has no comments in the pending review", vim.log.levels.WARN)
+      return
+    end
+    vim.ui.select({ "Delete", "Cancel" }, {
+      prompt = "Delete pending comment?",
+    }, function(choice)
+      if choice ~= "Delete" then return end
+      api_mod.graphql(graphql.MUTATION_DELETE_REVIEW_COMMENT, {
+        commentId = comment.id,
+      }, function(result)
+        local payload = (((result or {}).data or {}).deletePullRequestReviewComment or {})
+        local deleted = payload.pullRequestReviewComment or {}
+        if not deleted.id then
+          vim.notify("[gh-review] Failed to delete pending comment", vim.log.levels.ERROR)
+          return
+        end
+        print("Pending comment deleted")
+        if state.get_thread_bufnr() == bufnr then M.close_thread_buffer() end
+        -- Deleting the first comment can remove the entire thread, so refresh
+        -- from GitHub instead of trying to repair the local thread in place.
+        require("gh_review").refresh_threads()
+      end)
+    end)
+  end
+
+  if selected then
+    confirm_delete(selected)
+  else
+    choose_pending_comment(candidates, "Delete pending comment:", confirm_delete)
   end
 end
 
@@ -268,6 +397,7 @@ local ACTIONS = {
     { "i", function() vim.cmd("stopinsert") submit_reply() end, "Submit reply" },
   },
   resolve = { { "n", toggle_resolve, "Toggle resolved" } },
+  delete_comment = { { "n", delete_pending_comment, "Delete pending comment" } },
   close   = { { "n", function() M.close_thread_buffer() end, "Close thread" } },
   close_insert = {
     { "n", function() M.close_thread_buffer() end, "Close thread" },
@@ -297,7 +427,7 @@ function M.omnifunc(findstart, base)
   return matches
 end
 
-local function show_thread(t)
+local function show_thread(t, edit_comment)
   -- Close existing thread buffer if open
   M.close_thread_buffer()
 
@@ -311,6 +441,7 @@ local function show_thread(t)
   local comments_obj = state.get(t, "comments", {})
   local comments = state.get(comments_obj, "nodes", {})
   local status_label = is_resolved and "Resolved" or "Active"
+  if edit_comment then status_label = status_label .. " · Editing pending comment" end
   local is_new = (thread_id == "")
 
   -- Build buffer content
@@ -363,14 +494,15 @@ local function show_thread(t)
   end
 
   -- Reply separator
-  lines[#lines + 1] = reply_separator()
+  lines[#lines + 1] = reply_separator(edit_comment ~= nil)
   lines[#lines + 1] = ""
 
   local reply_start = #lines
 
   local initial_body = state.get(t, "_initial_body", "")
-  if initial_body ~= "" then
-    local body_lines = vim.split(initial_body, "\n", { plain = true })
+  local reply_body = edit_comment and state.get(edit_comment, "body", "") or initial_body
+  if reply_body ~= "" then
+    local body_lines = vim.split(reply_body, "\n", { plain = true })
     for _, bl in ipairs(body_lines) do
       lines[#lines + 1] = bl
     end
@@ -407,6 +539,10 @@ local function show_thread(t)
   vim.b[bufnr].gh_review_reply_start = reply_start
   vim.b[bufnr].gh_review_is_new = is_new
   vim.b[bufnr].gh_review_is_resolved = is_resolved
+  vim.b[bufnr].gh_review_edit_comment_id = edit_comment and edit_comment.id or ""
+  -- Compare normalized buffer text on save so merely opening an editable
+  -- pending comment never sends a redundant update mutation.
+  vim.b[bufnr].gh_review_edit_original_body = edit_comment and get_reply_text(bufnr, reply_start) or ""
 
   -- Store the first comment id (needed for REST reply)
   if #comments > 0 then
@@ -435,7 +571,7 @@ local function show_thread(t)
 
   -- Position cursor at the reply area
   local total_lines = vim.api.nvim_buf_line_count(bufnr)
-  if initial_body ~= "" then
+  if reply_body ~= "" then
     local target = math.min(reply_start + 2, total_lines)
     vim.api.nvim_win_set_cursor(0, { target, 0 })
   else
@@ -453,7 +589,9 @@ function M.open(thread_id)
     vim.notify("[gh-review] Thread not found: " .. thread_id, vim.log.levels.ERROR)
     return
   end
-  show_thread(t)
+  choose_pending_comment(pending_comments(t), "Edit pending comment:", function(comment)
+    show_thread(t, comment)
+  end)
 end
 
 -- Open a new comment thread (no existing comments yet).

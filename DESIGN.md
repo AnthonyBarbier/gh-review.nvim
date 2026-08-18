@@ -330,12 +330,21 @@ Three paths depending on context:
 2. **Reply with active review**: `addPullRequestReviewComment` mutation using the pending review ID.
 3. **Standalone reply** (no pending review): first tries the REST API (`POST .../comments/<id>/replies`). If that fails (e.g., node ID not accepted), falls back to creating a temporary review, adding the comment, and immediately submitting it as `COMMENT`.
 
+Comments belonging to the active pending review are mutable. Opening a thread
+loads its sole pending comment into the reply area, or uses `vim.ui.select`
+when several are present. Save compares normalized reply text with the
+original and calls `updatePullRequestReviewComment` only after an edit.
+`Ctrl-D` confirms and calls `deletePullRequestReviewComment`; the plugin then
+refreshes all threads because deleting a thread's first comment can remove the
+thread itself.
+
 #### Keymaps
 
 | Key      | Action                                       |
 |----------|----------------------------------------------|
 | `Ctrl-S` | Submit reply (works in normal and insert mode) |
 | `Ctrl-R` | Toggle resolved/unresolved                   |
+| `Ctrl-D` | Delete pending comment being edited          |
 | `q`      | Close thread buffer                          |
 | `Ctrl-Q` | Close thread buffer (works in insert mode)   |
 

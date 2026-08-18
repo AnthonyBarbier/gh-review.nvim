@@ -514,6 +514,129 @@ h.run_test("Thread buffer: omnifunc is set", function()
   cleanup_diff_buffers()
 end)
 
+h.run_test("Thread: pending comment is loaded and edited instead of replied to", function()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  state.set_threads(fixtures.mock_thread_nodes())
+  setup_diff_buffers("src/existing.ts", 30)
+
+  thread.open("thread_4")
+  local bufnr = state.get_thread_bufnr()
+  local reply_start = vim.b[bufnr].gh_review_reply_start
+  h.assert_equal("comment_5", vim.b[bufnr].gh_review_edit_comment_id)
+  local reply = table.concat(vim.api.nvim_buf_get_lines(bufnr, reply_start - 1, -1, false), "\n")
+  h.assert_match("Pending note", reply)
+  vim.api.nvim_buf_set_lines(bufnr, reply_start - 1, -1, false, { "Updated pending note" })
+
+  local api = require("gh_review.api")
+  local original_graphql = api.graphql
+  local captured = {}
+  api.graphql = function(mutation, vars, callback)
+    captured.mutation = mutation
+    captured.vars = vars
+    callback({ data = { updatePullRequestReviewComment = { pullRequestReviewComment = {
+      id = "comment_5", body = vars.body,
+    } } } })
+  end
+  vim.fn.maparg("<C-s>", "n", false, true).callback()
+  api.graphql = original_graphql
+
+  h.assert_equal(require("gh_review.graphql").MUTATION_UPDATE_REVIEW_COMMENT, captured.mutation)
+  h.assert_equal("comment_5", captured.vars.commentId)
+  h.assert_equal("Updated pending note", captured.vars.body)
+  h.assert_equal("Updated pending note", state.get_thread("thread_4").comments.nodes[1].body)
+  h.assert_equal(-1, state.get_thread_bufnr(), "successful update closes the editor")
+  cleanup_diff_buffers()
+end)
+
+h.run_test("Thread: unchanged pending comment does not call GitHub", function()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  state.set_threads(fixtures.mock_thread_nodes())
+  thread.open("thread_4")
+
+  local api = require("gh_review.api")
+  local original_graphql = api.graphql
+  local calls = 0
+  api.graphql = function() calls = calls + 1 end
+  vim.fn.maparg("<C-s>", "n", false, true).callback()
+  api.graphql = original_graphql
+
+  h.assert_equal(0, calls)
+  h.assert_true(state.get_thread_bufnr() ~= -1, "unchanged editor remains open")
+  thread.close_thread_buffer()
+end)
+
+h.run_test("Thread: multiple pending comments use a picker", function()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  local nodes = fixtures.mock_thread_nodes()
+  nodes[4].comments.nodes[#nodes[4].comments.nodes + 1] = {
+    id = "comment_6",
+    body = "Second pending note",
+    author = { login = "alice" },
+    createdAt = "2025-01-16T10:00:00Z",
+    pullRequestReview = { id = "pending_rev_1", state = "PENDING" },
+  }
+  state.set_threads(nodes)
+
+  local original_select = vim.ui.select
+  local option_count = 0
+  vim.ui.select = function(items, opts, callback)
+    option_count = #items
+    h.assert_equal("Edit pending comment:", opts.prompt)
+    h.assert_match("Second pending note", opts.format_item(items[2]))
+    callback(items[2])
+  end
+  thread.open("thread_4")
+  vim.ui.select = original_select
+
+  h.assert_equal(2, option_count)
+  local bufnr = state.get_thread_bufnr()
+  h.assert_equal("comment_6", vim.b[bufnr].gh_review_edit_comment_id)
+  local reply_start = vim.b[bufnr].gh_review_reply_start
+  local reply = table.concat(vim.api.nvim_buf_get_lines(bufnr, reply_start - 1, -1, false), "\n")
+  h.assert_match("Second pending note", reply)
+  thread.close_thread_buffer()
+end)
+
+h.run_test("Thread: Ctrl-D confirms and deletes the selected pending comment", function()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  state.set_threads(fixtures.mock_thread_nodes())
+  thread.open("thread_4")
+
+  local original_select = vim.ui.select
+  vim.ui.select = function(items, opts, callback)
+    h.assert_equal("Delete pending comment?", opts.prompt)
+    callback(items[1])
+  end
+  local api = require("gh_review.api")
+  local original_graphql = api.graphql
+  local captured = {}
+  api.graphql = function(mutation, vars, callback)
+    captured.mutation = mutation
+    captured.vars = vars
+    callback({ data = { deletePullRequestReviewComment = {
+      pullRequestReviewComment = { id = vars.commentId },
+    } } })
+  end
+  local init = require("gh_review")
+  local original_refresh = init.refresh_threads
+  local refresh_count = 0
+  init.refresh_threads = function() refresh_count = refresh_count + 1 end
+
+  vim.fn.maparg("<C-d>", "n", false, true).callback()
+  vim.ui.select = original_select
+  api.graphql = original_graphql
+  init.refresh_threads = original_refresh
+
+  h.assert_equal(require("gh_review.graphql").MUTATION_DELETE_REVIEW_COMMENT, captured.mutation)
+  h.assert_equal("comment_5", captured.vars.commentId)
+  h.assert_equal(1, refresh_count)
+  h.assert_equal(-1, state.get_thread_bufnr(), "successful deletion closes the editor")
+end)
+
 h.run_test("Thread: reply separator text follows configured keys", function()
   local config = require("gh_review.config")
   config.reset()
@@ -543,7 +666,7 @@ end)
 h.run_test("Thread: keymaps honour configuration", function()
   local config = require("gh_review.config")
   config.reset()
-  config.setup({ keymaps = { thread = { resolve = "Z", close_insert = false } } })
+  config.setup({ keymaps = { thread = { resolve = "Z", delete_comment = "X", close_insert = false } } })
 
   state.reset()
   state.set_pr(fixtures.mock_pr_data())
@@ -558,6 +681,7 @@ h.run_test("Thread: keymaps honour configuration", function()
   end
 
   h.assert_true(mapped("n", "Z") ~= nil, "resolve remapped")
+  h.assert_true(mapped("n", "X") ~= nil, "delete comment remapped")
   h.assert_true(mapped("n", "q") ~= nil, "close default intact")
   h.assert_true(mapped("i", "<C-Q>") == nil, "close_insert disabled in insert mode")
   h.assert_true(mapped("i", "<C-S>") ~= nil, "submit still bound in insert mode")
