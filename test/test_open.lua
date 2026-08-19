@@ -1,6 +1,7 @@
 -- Tests for URL parsing and argument handling in open().
 
 local h = require("test.helpers")
+local fixtures = require("test.fixtures")
 
 -- Helper: given a string argument, return a table with owner, name, number
 -- using the same parsing logic as open().
@@ -77,6 +78,56 @@ h.run_test("Parse URL with commits tab and SHA", function()
   h.assert_equal("mdn", result.owner)
   h.assert_equal("content", result.name)
   h.assert_equal(42276, result.number)
+end)
+
+h.run_test("Merge base uses immutable PR OIDs when branch refs are unavailable", function()
+  local api = require("gh_review.api")
+  local config = require("gh_review.config")
+  local files = require("gh_review.files")
+  local review = require("gh_review")
+  local state = require("gh_review.state")
+  local original_graphql = api.graphql
+  local original_run_async = api.run_async
+  local original_files_open = files.open
+  local original_system = vim.system
+  local system_commands = {}
+  local compare_endpoint = ""
+
+  state.reset()
+  config.setup({ checkout = "never" })
+  vim.system = function(command)
+    system_commands[#system_commands + 1] = command
+    return {
+      wait = function()
+        if command[2] == "remote" then
+          return { code = 0, stdout = "https://github.com/testowner/testrepo.git\n" }
+        end
+        return { code = 1, stdout = "", stderr = "missing local object" }
+      end,
+    }
+  end
+  api.graphql = function(_, _, callback) callback(fixtures.mock_pr_data()) end
+  api.run_async = function(command, callback)
+    compare_endpoint = command[2]
+    callback(vim.json.encode({ merge_base_commit = { sha = "merge123" } }), "")
+  end
+  files.open = function() end
+
+  review.open("https://github.com/testowner/testrepo/pull/42")
+
+  vim.system = original_system
+  api.graphql = original_graphql
+  api.run_async = original_run_async
+  files.open = original_files_open
+  config.setup({})
+
+  -- Branch names may contain slashes, may not have local tracking refs, and
+  -- are ambiguous for fork PRs.  The GraphQL PR OIDs identify the exact pair
+  -- of commits whose merge base defines GitHub's full-PR diff.
+  h.assert_true(vim.deep_equal(
+    { "git", "merge-base", "aaa111", "bbb222" }, system_commands[2]))
+  h.assert_equal("/repos/testowner/testrepo/compare/aaa111...bbb222", compare_endpoint)
+  h.assert_equal("merge123", state.get_merge_base_oid())
 end)
 
 h.write_results("/tmp/gh_review_test_open.txt")

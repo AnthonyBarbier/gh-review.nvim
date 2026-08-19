@@ -64,12 +64,14 @@ end
 local function fetch_merge_base(callback)
   local owner = state.get_owner()
   local name = state.get_name()
-  local base = state.get_base_ref()
-  local head = state.get_head_ref()
+  local base_oid = state.get_base_oid()
+  local head_oid = state.get_head_oid()
 
-  -- Try local git merge-base first
-  local obj = vim.system({ "git", "merge-base",
-    "origin/" .. base, "origin/" .. head }, { text = true }):wait()
+  -- PR OIDs are immutable and identify the exact commits GitHub is comparing.
+  -- Remote-tracking refs may be stale or absent after fetching pull/<n>/head,
+  -- while branch names containing slashes also make REST compare paths
+  -- ambiguous.  Try the OIDs locally first, then use the same pair remotely.
+  local obj = vim.system({ "git", "merge-base", base_oid, head_oid }, { text = true }):wait()
 
   if obj.code == 0 and vim.trim(obj.stdout or "") ~= "" then
     state.set_merge_base_oid(vim.trim(obj.stdout))
@@ -79,7 +81,8 @@ local function fetch_merge_base(callback)
   end
 
   -- Fall back to REST compare endpoint
-  local endpoint = string.format("/repos/%s/%s/compare/%s...%s", owner, name, base, head)
+  local endpoint = string.format(
+    "/repos/%s/%s/compare/%s...%s", owner, name, base_oid, head_oid)
   api_mod.run_async({ "api", endpoint }, function(stdout, stderr)
     if stderr == "" or stderr == nil then
       local ok, parsed = pcall(vim.json.decode, stdout)
