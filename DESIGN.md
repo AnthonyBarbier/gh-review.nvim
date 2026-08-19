@@ -222,7 +222,9 @@ Files changed (3)
 - `:GHReviewThreads` builds a stable file/line-sorted picker from the threads
   already loaded for the PR. Selection opens the target diff asynchronously;
   an explicit completion callback then positions the correct side and line
-  before opening the conversation pane.
+  before opening the conversation pane. The picker filters its stable source
+  list in place with `a` (all), `u` (unresolved), and `p` (pending); empty
+  filters remain open so the user can immediately choose another view.
 - When the files list closes, `wincmd =` equalizes window heights, then a scroll nudge (`Ctrl-E` / `Ctrl-Y`) in each diff window forces scrollbind viewports to update.
 
 ### Side-by-side diff (`diff.lua`)

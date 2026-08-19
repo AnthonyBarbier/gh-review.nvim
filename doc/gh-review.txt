@@ -136,7 +136,8 @@ A quick-start sequence for either workflow: >
 :GHReviewThreads        List all review threads in the current PR, ordered by
                         file and line.  Selecting one opens that file's diff,
                         moves to the commented side and line, and opens the
-                        thread conversation.
+                        thread conversation.  Press a for all threads, u for
+                        unresolved threads, or p for pending threads.
 
                                                               *:GHReviewStart*
 :GHReviewStart          Start a pending review.  All subsequent comments will

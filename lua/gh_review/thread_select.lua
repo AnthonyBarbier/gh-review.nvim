@@ -25,12 +25,18 @@ local function close_picker()
   end
 end
 
+local function is_pending(thread)
+  local comments = state.get(state.get(thread, "comments", {}), "nodes", {})
+  for _, comment in ipairs(comments) do
+    local review = state.get(comment, "pullRequestReview", {})
+    if state.get(review, "state", "") == "PENDING" then return true end
+  end
+  return false
+end
+
 local function status(thread)
   local labels = {}
-  local comments = state.get(state.get(thread, "comments", {}), "nodes", {})
-  local last_comment = comments[#comments] or {}
-  local review = state.get(last_comment, "pullRequestReview", {})
-  if state.get(review, "state", "") == "PENDING" then labels[#labels + 1] = "pending" end
+  if is_pending(thread) then labels[#labels + 1] = "pending" end
   if state.get(thread, "isResolved", false) then labels[#labels + 1] = "resolved" end
   if state.get(thread, "isOutdated", false) then labels[#labels + 1] = "outdated" end
   if #labels == 0 then labels[1] = "active" end
@@ -96,16 +102,16 @@ function M.open()
     return
   end
 
-  local threads = sorted_threads()
-  if #threads == 0 then
+  local all_threads = sorted_threads()
+  if #all_threads == 0 then
     vim.notify("[gh-review] No review threads found")
     return
   end
 
   close_picker()
   local lines = {}
-  local max_width = vim.fn.strdisplaywidth("Select review thread")
-  for _, thread in ipairs(threads) do
+  local max_width = vim.fn.strdisplaywidth("Threads [all] · a/u/p")
+  for _, thread in ipairs(all_threads) do
     local line = format_thread(thread)
     lines[#lines + 1] = line
     max_width = math.max(max_width, vim.fn.strdisplaywidth(line))
@@ -129,19 +135,50 @@ function M.open()
     height = height,
     style = "minimal",
     border = "rounded",
-    title = " Select review thread ",
+    title = " Threads [all] · a/u/p ",
     title_pos = "center",
   })
   vim.wo[picker_winid].cursorline = true
   vim.wo[picker_winid].wrap = false
 
+  local visible_threads = all_threads
+  local function apply_filter(name)
+    visible_threads = {}
+    for _, thread in ipairs(all_threads) do
+      local include = name == "all"
+        or (name == "unresolved" and not state.get(thread, "isResolved", false))
+        or (name == "pending" and is_pending(thread))
+      if include then visible_threads[#visible_threads + 1] = thread end
+    end
+
+    local filtered_lines = {}
+    for _, thread in ipairs(visible_threads) do filtered_lines[#filtered_lines + 1] = format_thread(thread) end
+    if #filtered_lines == 0 then filtered_lines[1] = "No " .. name .. " threads" end
+
+    vim.bo[picker_bufnr].modifiable = true
+    vim.api.nvim_buf_set_lines(picker_bufnr, 0, -1, false, filtered_lines)
+    vim.bo[picker_bufnr].modifiable = false
+    -- Keep the picker open when a filter is empty and expose the active filter
+    -- in its title, making rapid a/u/p switching visible and reversible.
+    vim.api.nvim_win_set_config(picker_winid, {
+      height = math.min(#filtered_lines, math.max(1, vim.o.lines - 4)),
+      title = string.format(" Threads [%s] · a/u/p ", name),
+      title_pos = "center",
+    })
+    vim.api.nvim_win_set_cursor(picker_winid, { 1, 0 })
+  end
+
   local function choose_current()
-    local choice = threads[vim.api.nvim_win_get_cursor(picker_winid)[1]]
+    local choice = visible_threads[vim.api.nvim_win_get_cursor(picker_winid)[1]]
+    if not choice then return end
     close_picker()
     navigate_to_thread(choice)
   end
   local map_opts = { buffer = picker_bufnr, silent = true, nowait = true }
   vim.keymap.set("n", "<CR>", choose_current, map_opts)
+  vim.keymap.set("n", "a", function() apply_filter("all") end, map_opts)
+  vim.keymap.set("n", "u", function() apply_filter("unresolved") end, map_opts)
+  vim.keymap.set("n", "p", function() apply_filter("pending") end, map_opts)
   vim.keymap.set("n", "q", close_picker, map_opts)
   vim.keymap.set("n", "<Esc>", close_picker, map_opts)
   vim.keymap.set("n", "<C-c>", close_picker, map_opts)
