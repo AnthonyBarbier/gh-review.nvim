@@ -212,6 +212,10 @@ A centered floating picker showing changed files with diff stats and thread coun
   and move one item in the requested direction through the active file order.
   They deliberately visit already-viewed files and stop at either boundary
   rather than wrapping.
+- `:GHReviewCurrentFile` resolves the active filesystem buffer relative to its
+  Git root and opens that path through the normal asynchronous diff pipeline.
+  Its completion callback restores the cursor line and byte column on the head
+  side; matching active diff paths return without rebuilding the view.
 - `:GHReviewCommits` fetches the complete, paginated PR commit list on demand.
   Choosing commit X compares `X...head` through GitHub's compare API, updates
   the files picker from that response, and uses X as the left side of subsequent

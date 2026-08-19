@@ -242,4 +242,48 @@ end
 function M.next_file() move_file(1) end
 function M.prev_file() move_file(-1) end
 
+function M.open_current_file()
+  if state.get_pr_id() == "" then
+    vim.notify("[gh-review] No PR loaded. Use :GHReview {number|url} first.", vim.log.levels.ERROR)
+    return
+  end
+
+  local source_bufnr = vim.api.nvim_get_current_buf()
+  -- Both sides of an existing review diff represent state.get_diff_path(); the
+  -- URI-backed base buffer has no useful filesystem path to resolve, and the
+  -- checked-out head buffer would resolve to the same path anyway.
+  if vim.b[source_bufnr].gh_review_diff and state.get_diff_path() ~= "" then return end
+
+  local buffer_name = vim.api.nvim_buf_get_name(source_bufnr)
+  local absolute = buffer_name ~= "" and vim.fs.normalize(buffer_name) or ""
+  local root = absolute ~= "" and vim.fs.root(absolute, ".git") or nil
+  if not root then
+    vim.notify("[gh-review] Current buffer is not a file in a Git repository", vim.log.levels.ERROR)
+    return
+  end
+  root = vim.fs.normalize(root)
+  local prefix = root .. "/"
+  if absolute:sub(1, #prefix) ~= prefix then
+    vim.notify("[gh-review] Could not resolve the current file relative to its repository", vim.log.levels.ERROR)
+    return
+  end
+
+  local path = absolute:sub(#prefix + 1)
+  if path == state.get_diff_path() then return end
+
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  require("gh_review.diff").open(path, function(_, right_bufnr)
+    local winid = right_bufnr and vim.fn.bufwinid(right_bufnr) or -1
+    if winid == -1 or not vim.api.nvim_win_is_valid(winid) then return end
+    local line_count = vim.api.nvim_buf_line_count(right_bufnr)
+    local target_line = math.max(1, math.min(cursor[1], line_count))
+    local text = vim.api.nvim_buf_get_lines(right_bufnr, target_line - 1, target_line, false)[1] or ""
+    -- Neovim columns are zero-based byte offsets. Clamp when the reviewed head
+    -- line is shorter than the working-tree line that supplied the cursor.
+    local target_col = math.min(cursor[2], #text)
+    vim.fn.win_gotoid(winid)
+    vim.api.nvim_win_set_cursor(winid, { target_line, target_col })
+  end)
+end
+
 return M

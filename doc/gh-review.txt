@@ -89,6 +89,7 @@ A quick-start sequence for either workflow: >
     <CR>                    Open a file’s side-by-side diff
     :GHReviewNextFile       Mark this file reviewed and open the next
     :GHReviewPrevFile       Mark this file reviewed and open the previous
+    :GHReviewCurrentFile    Open the current file in the review
     ]t / [t                 Jump between review threads
     gt                      View a thread
     gc                      Add a comment
@@ -134,6 +135,11 @@ A quick-start sequence for either workflow: >
                         reviewed, then open the previous file in PR order.
                         Already reviewed files are not skipped.  On the first
                         file, mark it reviewed and stop without wrapping.
+
+                                                        *:GHReviewCurrentFile*
+:GHReviewCurrentFile    Open the current filesystem buffer in the loaded review
+                        and preserve its cursor line and column.  If that file
+                        is already the active review diff, do nothing.
 
                                                             *:GHReviewCommits*
 :GHReviewCommits        List every commit in the current PR and choose the

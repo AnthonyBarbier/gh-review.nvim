@@ -163,6 +163,7 @@ When the URL refers to a different repo than the current working directory, no c
 <CR>                    Open a file’s side-by-side diff
 :GHReviewNextFile       Mark this file reviewed and open the next file
 :GHReviewPrevFile       Mark this file reviewed and open the previous file
+:GHReviewCurrentFile    Open the current buffer in the review at its cursor
 ]t / [t                 Jump between review threads
 gt                      View a thread
 K                       Preview a thread (floating window)
@@ -181,6 +182,7 @@ gF                      Jump to the file with LSP (checkout only)
 | `:GHReviewFiles`   | Toggle the changed-files picker                              |
 | `:GHReviewNextFile` | Mark the current file reviewed and advance to the next file; stop at the end |
 | `:GHReviewPrevFile` | Mark the current file reviewed and move to the previous file; stop at the start |
+| `:GHReviewCurrentFile` | Open the current filesystem buffer in the loaded review while preserving its cursor |
 | `:GHReviewCommits` | Choose a commit and review only its subsequent changes; your last reviewed commit is marked |
 | `:GHReviewThreads` | Select any review thread and open its file, line, and conversation; filter with `a`/`u`/`p`, or press `c` to load the filtered threads into quickfix |
 | `:GHReviewStart`   | Start a pending review (optional — `:GHReviewSubmit` works without it) |

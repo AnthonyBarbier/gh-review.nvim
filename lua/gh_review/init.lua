@@ -258,6 +258,11 @@ function M.prev_file()
   files.prev_file()
 end
 
+-- Open the active filesystem buffer in the loaded review at the same cursor.
+function M.open_current_file()
+  files.open_current_file()
+end
+
 -- Select an active PR from the current repository before entering the normal
 -- open workflow, including its configured checkout policy.
 function M.select_pr()

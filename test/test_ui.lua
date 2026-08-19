@@ -475,4 +475,65 @@ h.run_test("GHReviewPrevFile command is registered", function()
   h.assert_equal(2, vim.fn.exists(":GHReviewPrevFile"))
 end)
 
+h.run_test("Current file opens its review diff and preserves cursor", function()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  state.set_diff_path("src/other.lua")
+  local root = vim.fs.root(vim.fn.getcwd(), ".git")
+  local source = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_name(source, root .. "/src/current_file_command_test.lua")
+  vim.api.nvim_buf_set_lines(source, 0, -1, false, { "one", "0123456789", "three" })
+  vim.cmd("buffer " .. source)
+  vim.api.nvim_win_set_cursor(0, { 2, 6 })
+
+  local opened_path
+  local right
+  local original_diff = package.loaded["gh_review.diff"]
+  package.loaded["gh_review.diff"] = { open = function(path, callback)
+    opened_path = path
+    right = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(right, 0, -1, false, { "head one", "abcdefghij", "head three" })
+    vim.cmd("buffer " .. right)
+    callback(-1, right)
+  end }
+
+  files.open_current_file()
+
+  package.loaded["gh_review.diff"] = original_diff
+  h.assert_equal("src/current_file_command_test.lua", opened_path)
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  h.assert_equal(2, cursor[1])
+  h.assert_equal(6, cursor[2])
+  vim.cmd("bwipeout! " .. source)
+  vim.cmd("bwipeout! " .. right)
+end)
+
+h.run_test("Current file does nothing when its review diff is already open", function()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  local root = vim.fs.root(vim.fn.getcwd(), ".git")
+  local bufnr = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_name(bufnr, root .. "/src/already_reviewed.lua")
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "one", "two" })
+  vim.cmd("buffer " .. bufnr)
+  vim.api.nvim_win_set_cursor(0, { 2, 1 })
+  state.set_diff_path("src/already_reviewed.lua")
+
+  local open_count = 0
+  local original_diff = package.loaded["gh_review.diff"]
+  package.loaded["gh_review.diff"] = { open = function() open_count = open_count + 1 end }
+  files.open_current_file()
+  package.loaded["gh_review.diff"] = original_diff
+
+  h.assert_equal(0, open_count)
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  h.assert_equal(2, cursor[1])
+  h.assert_equal(1, cursor[2])
+  vim.cmd("bwipeout! " .. bufnr)
+end)
+
+h.run_test("GHReviewCurrentFile command is registered", function()
+  h.assert_equal(2, vim.fn.exists(":GHReviewCurrentFile"))
+end)
+
 h.write_results("/tmp/gh_review_test_ui.txt")
