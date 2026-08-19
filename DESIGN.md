@@ -225,7 +225,11 @@ A centered floating picker showing changed files with diff stats and thread coun
   an explicit completion callback then positions the correct side and line
   before opening the conversation pane. The picker filters its stable source
   list in place with `a` (all), `u` (unresolved), and `p` (pending); empty
-  filters remain open so the user can immediately choose another view.
+  filters remain open so the user can immediately choose another view. In a
+  local checkout, `c` writes the visible rows in errorformat-compatible form,
+  loads them through `:cfile`, deletes the transport file, and opens quickfix.
+  Remote reviews reject this action because ordinary quickfix paths would show
+  working-tree files rather than the fetched PR head.
 
 ### Side-by-side diff (`diff.lua`)
 

@@ -180,7 +180,7 @@ gF                      Jump to the file with LSP (checkout only)
 | `:GHReviewFiles`   | Toggle the changed-files picker                              |
 | `:GHReviewNextFile` | Mark the current file reviewed and advance to the next file; stop at the end |
 | `:GHReviewCommits` | Choose a commit and review only its subsequent changes; your last reviewed commit is marked |
-| `:GHReviewThreads` | Select any review thread and open its file, line, and conversation; filter with `a` (all), `u` (unresolved), or `p` (pending) |
+| `:GHReviewThreads` | Select any review thread and open its file, line, and conversation; filter with `a`/`u`/`p`, or press `c` to load the filtered threads into quickfix |
 | `:GHReviewStart`   | Start a pending review (optional — `:GHReviewSubmit` works without it) |
 | `:GHReviewSubmit`  | Submit a review (Comment / Approve / Request changes)         |
 | `:GHReviewDiscard` | Discard the pending review and all its pending comments       |

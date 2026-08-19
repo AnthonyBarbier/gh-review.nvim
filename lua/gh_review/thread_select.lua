@@ -96,6 +96,49 @@ local function navigate_to_thread(thread)
   end)
 end
 
+local function export_to_quickfix(threads)
+  if #threads == 0 then
+    vim.notify("[gh-review] No threads in the current filter", vim.log.levels.WARN)
+    return
+  end
+  if not state.is_local_checkout() then
+    -- :cfile creates ordinary file entries. In a remote review those paths
+    -- would resolve to unrelated working-tree content rather than the PR head.
+    vim.notify("[gh-review] Quickfix thread export requires a checked-out PR", vim.log.levels.ERROR)
+    return
+  end
+
+  local root = vim.fs.root(vim.fn.getcwd(), ".git")
+  if not root then
+    vim.notify("[gh-review] Could not find the repository root for quickfix", vim.log.levels.ERROR)
+    return
+  end
+
+  local entries = {}
+  for _, thread in ipairs(threads) do
+    local path = root .. "/" .. state.get(thread, "path", "")
+    entries[#entries + 1] = string.format("%s:%d:1: %s %s", path,
+      math.max(1, thread_line(thread)), status(thread), comment_preview(thread))
+  end
+
+  -- :cfile is intentionally the parser of record. The temporary file is only
+  -- transport: once quickfix owns the parsed entries it can be removed without
+  -- affecting navigation or the quickfix window.
+  local errorfile = vim.fn.tempname() .. "-gh-review-threads"
+  if vim.fn.writefile(entries, errorfile) ~= 0 then
+    vim.notify("[gh-review] Could not write the quickfix thread list", vim.log.levels.ERROR)
+    return
+  end
+  local ok, err = pcall(vim.cmd, "silent cfile " .. vim.fn.fnameescape(errorfile))
+  vim.fn.delete(errorfile)
+  if not ok then
+    vim.notify("[gh-review] Could not load thread quickfix: " .. tostring(err), vim.log.levels.ERROR)
+    return
+  end
+  close_picker()
+  vim.cmd("copen")
+end
+
 function M.open()
   if state.get_pr_id() == "" then
     vim.notify("[gh-review] No PR loaded. Use :GHReview {number|url} first.", vim.log.levels.ERROR)
@@ -110,7 +153,7 @@ function M.open()
 
   close_picker()
   local lines = {}
-  local max_width = vim.fn.strdisplaywidth("Threads [all] · a/u/p")
+  local max_width = vim.fn.strdisplaywidth("Threads [all] · a/u/p · c quickfix")
   for _, thread in ipairs(all_threads) do
     local line = format_thread(thread)
     lines[#lines + 1] = line
@@ -135,7 +178,7 @@ function M.open()
     height = height,
     style = "minimal",
     border = "rounded",
-    title = " Threads [all] · a/u/p ",
+    title = " Threads [all] · a/u/p · c quickfix ",
     title_pos = "center",
   })
   vim.wo[picker_winid].cursorline = true
@@ -162,7 +205,7 @@ function M.open()
     -- in its title, making rapid a/u/p switching visible and reversible.
     vim.api.nvim_win_set_config(picker_winid, {
       height = math.min(#filtered_lines, math.max(1, vim.o.lines - 4)),
-      title = string.format(" Threads [%s] · a/u/p ", name),
+      title = string.format(" Threads [%s] · a/u/p · c quickfix ", name),
       title_pos = "center",
     })
     vim.api.nvim_win_set_cursor(picker_winid, { 1, 0 })
@@ -179,6 +222,7 @@ function M.open()
   vim.keymap.set("n", "a", function() apply_filter("all") end, map_opts)
   vim.keymap.set("n", "u", function() apply_filter("unresolved") end, map_opts)
   vim.keymap.set("n", "p", function() apply_filter("pending") end, map_opts)
+  vim.keymap.set("n", "c", function() export_to_quickfix(visible_threads) end, map_opts)
   vim.keymap.set("n", "q", close_picker, map_opts)
   vim.keymap.set("n", "<Esc>", close_picker, map_opts)
   vim.keymap.set("n", "<C-c>", close_picker, map_opts)

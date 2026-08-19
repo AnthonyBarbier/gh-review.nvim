@@ -144,7 +144,10 @@ A quick-start sequence for either workflow: >
                         file and line.  Selecting one opens that file's diff,
                         moves to the commented side and line, and opens the
                         thread conversation.  Press a for all threads, u for
-                        unresolved threads, or p for pending threads.
+                        unresolved threads, or p for pending threads.  In a
+                        checked-out PR, press c to save the active filter to a
+                        temporary errorfile, load it with |:cfile|, and open the
+                        quickfix window.
 
                                                               *:GHReviewStart*
 :GHReviewStart          Start a pending review.  All subsequent comments will

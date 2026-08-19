@@ -109,6 +109,31 @@ h.run_test("Thread selector keeps an empty filter open", function()
   package.loaded["gh_review.thread_select"] = nil
 end)
 
+h.run_test("Thread selector exports the active filter through cfile", function()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  state.set_threads(fixtures.mock_thread_nodes())
+  state.set_local_checkout(true)
+  package.loaded["gh_review.thread_select"] = nil
+
+  require("gh_review.thread_select").open()
+  local picker_winid = vim.api.nvim_get_current_win()
+  vim.fn.maparg("p", "n", false, true).callback()
+  vim.fn.maparg("c", "n", false, true).callback()
+
+  local items = vim.fn.getqflist()
+  h.assert_equal(1, #items, "only the pending-filter row is exported")
+  h.assert_equal(5, items[1].lnum)
+  h.assert_match("%[pending%]", items[1].text)
+  h.assert_match("alice: Pending note", items[1].text)
+  h.assert_match("src/existing.ts$", vim.api.nvim_buf_get_name(items[1].bufnr))
+  h.assert_false(vim.api.nvim_win_is_valid(picker_winid), "export closes the thread picker")
+  h.assert_true(vim.fn.getqflist({ winid = 0 }).winid ~= 0, "quickfix window is opened")
+
+  vim.cmd("cclose")
+  package.loaded["gh_review.thread_select"] = nil
+end)
+
 h.run_test("GHReviewThreads command is registered", function()
   h.assert_equal(2, vim.fn.exists(":GHReviewThreads"))
 end)
