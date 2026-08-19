@@ -600,6 +600,36 @@ h.run_test("Thread: first inline comment records implicitly created pending revi
   cleanup_diff_buffers()
 end)
 
+h.run_test("Thread: null thread reports a line outside the diff", function()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  setup_diff_buffers("src/new_file.ts", 30)
+
+  thread.open_new("src/new_file.ts", 10, 10, "RIGHT", "")
+  local bufnr = state.get_thread_bufnr()
+  local reply_start = vim.b[bufnr].gh_review_reply_start
+  vim.api.nvim_buf_set_lines(bufnr, reply_start - 1, -1, false, { "Comment outside the diff" })
+
+  local api = require("gh_review.api")
+  local original_graphql = api.graphql
+  local original_notify = vim.notify
+  local notification = ""
+  api.graphql = function(_, _, callback)
+    -- GitHub represents an invalid inline-comment location as a successful
+    -- mutation payload whose nullable thread field is JSON null/vim.NIL.
+    callback({ data = { addPullRequestReviewThread = { thread = vim.NIL } } })
+  end
+  vim.notify = function(message) notification = message end
+  vim.fn.maparg("<C-s>", "n", false, true).callback()
+  vim.notify = original_notify
+  api.graphql = original_graphql
+
+  h.assert_match("line is not part of the diff", notification)
+  h.assert_true(state.get_thread_bufnr() ~= -1, "failed comment remains open for recovery")
+  thread.close_thread_buffer()
+  cleanup_diff_buffers()
+end)
+
 h.run_test("Thread: multiple pending comments use a picker", function()
   state.reset()
   state.set_pr(fixtures.mock_pr_data())

@@ -146,8 +146,15 @@ local function submit_new_thread(body, bufnr)
 
   print("Submitting comment...")
   api_mod.graphql(graphql.MUTATION_ADD_REVIEW_THREAD, vars, function(result)
-    local new_thread = ((((result or {}).data or {}).addPullRequestReviewThread or {}).thread or {})
-    if new_thread and new_thread.id then
+    -- GitHub returns a successful mutation payload with `thread: null` when
+    -- the requested line is outside its stored PR patch.  JSON null becomes
+    -- vim.NIL, which is truthy userdata in Lua, so `or {}` cannot normalize it.
+    -- Use the state helper at every nullable boundary both to avoid indexing
+    -- userdata and to turn this API-specific failure into an actionable error.
+    local data = state.get(result, "data", {})
+    local payload = state.get(data, "addPullRequestReviewThread", {})
+    local new_thread = state.get(payload, "thread", {})
+    if state.get(new_thread, "id", "") ~= "" then
       -- GitHub creates a pending review implicitly when the first inline thread
       -- is added without pullRequestReviewId.  Keep that server-created review
       -- in local state so a later submit updates it instead of attempting to
@@ -163,7 +170,7 @@ local function submit_new_thread(body, bufnr)
       print("Comment submitted")
       M.close_thread_buffer()
     else
-      vim.notify("[gh-review] Failed to create thread", vim.log.levels.ERROR)
+      vim.notify("[gh-review] line is not part of the diff", vim.log.levels.ERROR)
     end
   end)
 end
