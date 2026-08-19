@@ -248,12 +248,12 @@ function M.toggle_files()
   files.toggle()
 end
 
--- Mark the displayed file reviewed and advance once through the PR file order.
+-- Advance once through the PR file order without changing its viewed state.
 function M.next_file()
   files.next_file()
 end
 
--- Mark the displayed file reviewed and move back once through the PR file order.
+-- Move back once through the PR file order without changing its viewed state.
 function M.prev_file()
   files.prev_file()
 end

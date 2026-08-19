@@ -208,10 +208,11 @@ A centered floating picker showing changed files with diff stats and thread coun
 - `<CR>` opens the side-by-side diff for the file under the cursor.
 - `R` refreshes threads from GitHub and rerenders.
 - `q` / `gf` closes the files picker.
-- `:GHReviewNextFile` and `:GHReviewPrevFile` mark the current diff path viewed
-  and move one item in the requested direction through the active file order.
-  They deliberately visit already-viewed files and stop at either boundary
-  rather than wrapping.
+- `:GHReviewNextFile` and `:GHReviewPrevFile` move one item in the requested
+  direction through the active file order. They do not infer viewed state from
+  navigation: completing review is an explicit files-picker action. They
+  deliberately visit already-viewed files and stop at either boundary rather
+  than wrapping.
 - `:GHReviewCurrentFile` resolves the active filesystem buffer relative to its
   Git root and opens that path through the normal asynchronous diff pipeline.
   Its completion callback restores the cursor line and byte column on the head

@@ -87,8 +87,8 @@ A quick-start sequence for either workflow: >
     :GHReviewCommits        Optionally choose changes after a prior commit
     :GHReviewThreads        Pick a thread and jump to its file and line
     <CR>                    Open a file’s side-by-side diff
-    :GHReviewNextFile       Mark this file reviewed and open the next
-    :GHReviewPrevFile       Mark this file reviewed and open the previous
+    :GHReviewNextFile       Open the next file without marking this one viewed
+    :GHReviewPrevFile       Open the previous file without marking this one viewed
     :GHReviewCurrentFile    Open the current file in the review
     ]t / [t                 Jump between review threads
     gt                      View a thread
@@ -125,16 +125,16 @@ A quick-start sequence for either workflow: >
 :GHReviewFiles          Toggle the floating changed-files picker.
 
                                                            *:GHReviewNextFile*
-:GHReviewNextFile       Mark the file currently displayed in the diff as
-                        reviewed, then open the next file in PR order.  Already
-                        reviewed files are not skipped.  On the final file, mark
-                        it reviewed and stop without wrapping.
+:GHReviewNextFile       Open the next file in PR order without changing the
+                        current file's viewed state.  Already reviewed files
+                        are not skipped.  On the final file, stop without
+                        wrapping.
 
                                                            *:GHReviewPrevFile*
-:GHReviewPrevFile       Mark the file currently displayed in the diff as
-                        reviewed, then open the previous file in PR order.
-                        Already reviewed files are not skipped.  On the first
-                        file, mark it reviewed and stop without wrapping.
+:GHReviewPrevFile       Open the previous file in PR order without changing the
+                        current file's viewed state.  Already reviewed files
+                        are not skipped.  On the first file, stop without
+                        wrapping.
 
                                                         *:GHReviewCurrentFile*
 :GHReviewCurrentFile    Open the current filesystem buffer in the loaded review

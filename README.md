@@ -161,8 +161,8 @@ When the URL refers to a different repo than the current working directory, no c
 :GHReviewCommits        Review only changes after a chosen PR commit
 :GHReviewThreads        Pick a review thread and jump to its file and line
 <CR>                    Open a file’s side-by-side diff
-:GHReviewNextFile       Mark this file reviewed and open the next file
-:GHReviewPrevFile       Mark this file reviewed and open the previous file
+:GHReviewNextFile       Open the next file without changing viewed state
+:GHReviewPrevFile       Open the previous file without changing viewed state
 :GHReviewCurrentFile    Open the current buffer in the review at its cursor
 ]t / [t                 Jump between review threads
 gt                      View a thread
@@ -180,8 +180,8 @@ gF                      Jump to the file with LSP (checkout only)
 | `:GHReview`        | Open a PR (auto-detect, by number, or by URL)                 |
 | `:GHReviewSelect`  | Select an active PR, with previously reviewed PRs listed first |
 | `:GHReviewFiles`   | Toggle the changed-files picker                              |
-| `:GHReviewNextFile` | Mark the current file reviewed and advance to the next file; stop at the end |
-| `:GHReviewPrevFile` | Mark the current file reviewed and move to the previous file; stop at the start |
+| `:GHReviewNextFile` | Advance to the next file without changing viewed state; stop at the end |
+| `:GHReviewPrevFile` | Move to the previous file without changing viewed state; stop at the start |
 | `:GHReviewCurrentFile` | Open the current filesystem buffer in the loaded review while preserving its cursor |
 | `:GHReviewCommits` | Choose a commit and review only its subsequent changes; your last reviewed commit is marked |
 | `:GHReviewThreads` | Select any review thread and open its file, line, and conversation; filter with `a`/`u`/`p`, or press `c` to load the filtered threads into quickfix |

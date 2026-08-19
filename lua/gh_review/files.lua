@@ -207,9 +207,11 @@ function M.rerender()
   if bufnr ~= -1 and vim.api.nvim_buf_is_valid(bufnr) and vim.fn.bufwinid(bufnr) ~= -1 then render() end
 end
 
--- Review files in exact PR order in either direction. Both commands share this
--- path so viewed-state updates, range validation, and non-wrapping boundaries
--- remain symmetric; already-viewed destinations are intentionally not skipped.
+-- Review files in exact PR order in either direction. Navigation deliberately
+-- does not change GitHub's viewed state: opening a diff is not proof that the
+-- reviewer finished it, so viewed state remains an explicit files-picker action.
+-- Both commands share this path to keep validation and boundaries symmetric;
+-- already-viewed destinations are intentionally not skipped.
 local function move_file(offset)
   local path = state.get_diff_path()
   if path == "" then
@@ -227,7 +229,6 @@ local function move_file(offset)
     return
   end
 
-  M.set_viewed(path, true)
   local target_index = current_index + offset
   if target_index < 1 or target_index > #files then
     local boundary = offset < 0 and "first" or "final"

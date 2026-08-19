@@ -1,4 +1,4 @@
--- Tests for the changed-files picker and viewed-state navigation.
+-- Tests for the changed-files picker and file navigation.
 
 local h = require("test.helpers")
 local fixtures = require("test.fixtures")
@@ -369,101 +369,71 @@ h.run_test("Files picker: keymaps honour configuration", function()
   config.reset()
 end)
 
-h.run_test("Next file marks current viewed and advances without skipping viewed files", function()
+h.run_test("Next file advances without changing viewed state or skipping viewed files", function()
   state.reset()
   local data = fixtures.mock_pr_data()
   data.data.repository.pullRequest.files.nodes[2].viewerViewedState = "VIEWED"
   state.set_pr(data)
   state.set_diff_path("src/new_file.ts")
 
-  local api = require("gh_review.api")
-  local original_graphql = api.graphql
-  local mutation_vars
-  api.graphql = function(_, vars, callback)
-    mutation_vars = vars
-    callback({ data = { markFileAsViewed = { pullRequest = { id = "PR_abc123" } } } })
-  end
   local opened_path
   local original_diff = package.loaded["gh_review.diff"]
   package.loaded["gh_review.diff"] = { open = function(path) opened_path = path end }
 
   files.next_file()
 
-  api.graphql = original_graphql
   package.loaded["gh_review.diff"] = original_diff
-  h.assert_equal("src/new_file.ts", mutation_vars.path)
-  h.assert_true(state.is_file_checked("src/new_file.ts"))
+  h.assert_false(state.is_file_checked("src/new_file.ts"))
   h.assert_equal("src/existing.ts", opened_path, "already-viewed next file is not skipped")
 end)
 
-h.run_test("Next file marks the final file viewed and stops", function()
+h.run_test("Next file leaves the final file unviewed and stops", function()
   state.reset()
   state.set_pr(fixtures.mock_pr_data())
   state.set_diff_path("src/old_file.ts")
 
-  local api = require("gh_review.api")
-  local original_graphql = api.graphql
-  api.graphql = function(_, _, callback)
-    callback({ data = { markFileAsViewed = { pullRequest = { id = "PR_abc123" } } } })
-  end
   local open_count = 0
   local original_diff = package.loaded["gh_review.diff"]
   package.loaded["gh_review.diff"] = { open = function() open_count = open_count + 1 end }
 
   files.next_file()
 
-  api.graphql = original_graphql
   package.loaded["gh_review.diff"] = original_diff
-  h.assert_true(state.is_file_checked("src/old_file.ts"))
+  h.assert_false(state.is_file_checked("src/old_file.ts"))
   h.assert_equal(0, open_count, "final file does not wrap")
 end)
 
-h.run_test("Previous file marks current viewed and moves backward without skipping", function()
+h.run_test("Previous file moves backward without changing viewed state or skipping", function()
   state.reset()
   local data = fixtures.mock_pr_data()
   data.data.repository.pullRequest.files.nodes[2].viewerViewedState = "VIEWED"
   state.set_pr(data)
   state.set_diff_path("src/old_file.ts")
 
-  local api = require("gh_review.api")
-  local original_graphql = api.graphql
-  local mutation_vars
-  api.graphql = function(_, vars, callback)
-    mutation_vars = vars
-    callback({ data = { markFileAsViewed = { pullRequest = { id = "PR_abc123" } } } })
-  end
   local opened_path
   local original_diff = package.loaded["gh_review.diff"]
   package.loaded["gh_review.diff"] = { open = function(path) opened_path = path end }
 
   files.prev_file()
 
-  api.graphql = original_graphql
   package.loaded["gh_review.diff"] = original_diff
-  h.assert_equal("src/old_file.ts", mutation_vars.path)
-  h.assert_true(state.is_file_checked("src/old_file.ts"))
+  h.assert_false(state.is_file_checked("src/old_file.ts"))
   h.assert_equal("src/existing.ts", opened_path, "already-viewed previous file is not skipped")
 end)
 
-h.run_test("Previous file marks the first file viewed and stops", function()
+h.run_test("Previous file leaves the first file unviewed and stops", function()
   state.reset()
   state.set_pr(fixtures.mock_pr_data())
   state.set_diff_path("src/new_file.ts")
 
-  local api = require("gh_review.api")
-  local original_graphql = api.graphql
-  api.graphql = function(_, _, callback)
-    callback({ data = { markFileAsViewed = { pullRequest = { id = "PR_abc123" } } } })
-  end
   local open_count = 0
   local original_diff = package.loaded["gh_review.diff"]
   package.loaded["gh_review.diff"] = { open = function() open_count = open_count + 1 end }
 
   files.prev_file()
 
-  api.graphql = original_graphql
   package.loaded["gh_review.diff"] = original_diff
-  h.assert_true(state.is_file_checked("src/new_file.ts"))
+  h.assert_false(state.is_file_checked("src/new_file.ts"))
   h.assert_equal(0, open_count, "first file does not wrap")
 end)
 
