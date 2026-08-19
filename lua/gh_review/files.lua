@@ -61,6 +61,7 @@ local function render()
     local height = math.min(#lines, math.max(1, vim.o.lines - 4))
     local width = math.min(max_width, math.max(1, vim.o.columns - 4))
     vim.api.nvim_win_set_config(winid, {
+      relative = "editor",
       width = width,
       height = height,
       row = math.max(0, math.floor((vim.o.lines - height) / 2) - 1),
