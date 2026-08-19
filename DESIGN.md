@@ -219,6 +219,10 @@ Files changed (3)
   restores the original files and merge base. The native floating picker
   rebuilds `GHReviewLastReviewed` from the active theme's resolved
   `DiagnosticInfo` attributes on every open, then adds bold emphasis.
+- `:GHReviewThreads` builds a stable file/line-sorted picker from the threads
+  already loaded for the PR. Selection opens the target diff asynchronously;
+  an explicit completion callback then positions the correct side and line
+  before opening the conversation pane.
 - When the files list closes, `wincmd =` equalizes window heights, then a scroll nudge (`Ctrl-E` / `Ctrl-Y`) in each diff window forces scrollbind viewports to update.
 
 ### Side-by-side diff (`diff.lua`)

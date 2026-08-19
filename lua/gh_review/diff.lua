@@ -501,7 +501,7 @@ local function setup_diff_buffer(bufnr, name, path, content, real_file)
   config.apply_keymaps(bufnr, "diff", ACTIONS)
 end
 
-local function show_diff(path, left_content, right_content)
+local function show_diff(path, left_content, right_content, on_open)
   local left_name = "gh-review://LEFT/" .. path
   local right_name = "gh-review://RIGHT/" .. path
 
@@ -597,6 +597,11 @@ local function show_diff(path, left_content, right_content)
   vim.fn.win_gotoid(vim.fn.bufwinid(right_bufnr))
   vim.cmd("normal! gg")
 
+  -- Content loading may be asynchronous (local git with a GraphQL fallback),
+  -- so consumers that navigate the rendered buffers receive an explicit
+  -- completion point instead of relying on timers or autocmd order.
+  if on_open then on_open(left_bufnr, right_bufnr) end
+
   -- Workaround: Neovim fails to render syntax concealing when
   -- foldmethod=diff has closed folds.  Opening all folds, forcing
   -- a redraw, then re-closing them refreshes the conceal state.
@@ -670,7 +675,7 @@ local function fetch_git_content(ref, path, callback)
   end)
 end
 
-local function fetch_contents(base_oid, head_oid, path)
+local function fetch_contents(base_oid, head_oid, path, on_open)
   -- Determine change type for this file
   local change_type = "MODIFIED"
   local base_path = path
@@ -691,7 +696,7 @@ local function fetch_contents(base_oid, head_oid, path)
     fetches_done = fetches_done + 1
     if fetches_done >= total_fetches then
       vim.schedule(function()
-        show_diff(path, left_content, right_content)
+        show_diff(path, left_content, right_content, on_open)
       end)
     end
   end
@@ -720,12 +725,12 @@ local function fetch_contents(base_oid, head_oid, path)
   -- Check if both were synchronous (ADDED/DELETED)
   if fetches_done >= total_fetches then
     vim.schedule(function()
-      show_diff(path, left_content, right_content)
+      show_diff(path, left_content, right_content, on_open)
     end)
   end
 end
 
-function M.open(path)
+function M.open(path, on_open)
   state.set_diff_path(path)
 
   local base_oid = state.get_diff_base_oid()
@@ -737,7 +742,7 @@ function M.open(path)
   end
   local head_oid = state.get_head_oid()
 
-  fetch_contents(base_oid, head_oid, path)
+  fetch_contents(base_oid, head_oid, path, on_open)
 end
 
 function M.goto_file()

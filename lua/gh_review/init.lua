@@ -262,6 +262,13 @@ function M.choose_commit()
   require("gh_review.commits").choose()
 end
 
+-- Pick a thread from the entire PR, independently of the file currently shown
+-- in the diff. The selector owns cross-file navigation so thread.lua can stay
+-- focused on rendering and editing one already-selected conversation.
+function M.choose_thread()
+  require("gh_review.thread_select").open()
+end
+
 -- Start a pending review.
 function M.start_review()
   if state.is_review_active() then

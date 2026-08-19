@@ -27,6 +27,10 @@ vim.api.nvim_create_user_command("GHReviewCommits", function()
   require("gh_review").choose_commit()
 end, { nargs = 0 })
 
+vim.api.nvim_create_user_command("GHReviewThreads", function()
+  require("gh_review").choose_thread()
+end, { nargs = 0 })
+
 vim.api.nvim_create_user_command("GHReviewStart", function()
   require("gh_review").start_review()
 end, { nargs = 0 })

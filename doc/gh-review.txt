@@ -85,6 +85,7 @@ A quick-start sequence for either workflow: >
     :GHReview 123           Open PR #123 (or :GHReview {url})
     :GHReviewSelect         Pick an active PR in the current repository
     :GHReviewCommits        Optionally choose changes after a prior commit
+    :GHReviewThreads        Pick a thread and jump to its file and line
     <CR>                    Open a file’s side-by-side diff
     ]t / [t                 Jump between review threads
     gt                      View a thread
@@ -130,6 +131,12 @@ A quick-start sequence for either workflow: >
                         submitted review is annotated as "last reviewed" in
                         a theme-derived bold color.  In the picker, press
                         <CR> to select or q, <Esc>, or <C-c> to cancel.
+
+                                                            *:GHReviewThreads*
+:GHReviewThreads        List all review threads in the current PR, ordered by
+                        file and line.  Selecting one opens that file's diff,
+                        moves to the commented side and line, and opens the
+                        thread conversation.
 
                                                               *:GHReviewStart*
 :GHReviewStart          Start a pending review.  All subsequent comments will
