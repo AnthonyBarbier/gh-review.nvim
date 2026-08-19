@@ -23,6 +23,10 @@ vim.api.nvim_create_user_command("GHReviewNextFile", function()
   require("gh_review").next_file()
 end, { nargs = 0 })
 
+vim.api.nvim_create_user_command("GHReviewPrevFile", function()
+  require("gh_review").prev_file()
+end, { nargs = 0 })
+
 vim.api.nvim_create_user_command("GHReviewSelect", function()
   require("gh_review").select_pr()
 end, { nargs = 0 })

@@ -208,9 +208,10 @@ A centered floating picker showing changed files with diff stats and thread coun
 - `<CR>` opens the side-by-side diff for the file under the cursor.
 - `R` refreshes threads from GitHub and rerenders.
 - `q` / `gf` closes the files picker.
-- `:GHReviewNextFile` marks the current diff path viewed and opens the next item
-  in the active file order. It deliberately visits already-viewed files and
-  stops after marking the last file rather than wrapping.
+- `:GHReviewNextFile` and `:GHReviewPrevFile` mark the current diff path viewed
+  and move one item in the requested direction through the active file order.
+  They deliberately visit already-viewed files and stop at either boundary
+  rather than wrapping.
 - `:GHReviewCommits` fetches the complete, paginated PR commit list on demand.
   Choosing commit X compares `X...head` through GitHub's compare API, updates
   the files picker from that response, and uses X as the left side of subsequent

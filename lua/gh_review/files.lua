@@ -207,10 +207,10 @@ function M.rerender()
   if bufnr ~= -1 and vim.api.nvim_buf_is_valid(bufnr) and vim.fn.bufwinid(bufnr) ~= -1 then render() end
 end
 
--- Review files in the exact PR order: mark the current diff viewed, then move
--- one slot forward. Already-viewed files are intentionally not skipped, and
--- reaching the last file marks it viewed without wrapping.
-function M.next_file()
+-- Review files in exact PR order in either direction. Both commands share this
+-- path so viewed-state updates, range validation, and non-wrapping boundaries
+-- remain symmetric; already-viewed destinations are intentionally not skipped.
+local function move_file(offset)
   local path = state.get_diff_path()
   if path == "" then
     vim.notify("[gh-review] No review file is currently open", vim.log.levels.ERROR)
@@ -228,13 +228,18 @@ function M.next_file()
   end
 
   M.set_viewed(path, true)
-  if current_index == #files then
-    vim.notify("[gh-review] Reached the final file")
+  local target_index = current_index + offset
+  if target_index < 1 or target_index > #files then
+    local boundary = offset < 0 and "first" or "final"
+    vim.notify("[gh-review] Reached the " .. boundary .. " file")
     return
   end
 
   M.close()
-  require("gh_review.diff").open(state.get(files[current_index + 1], "path", ""))
+  require("gh_review.diff").open(state.get(files[target_index], "path", ""))
 end
+
+function M.next_file() move_file(1) end
+function M.prev_file() move_file(-1) end
 
 return M

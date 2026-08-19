@@ -253,6 +253,11 @@ function M.next_file()
   files.next_file()
 end
 
+-- Mark the displayed file reviewed and move back once through the PR file order.
+function M.prev_file()
+  files.prev_file()
+end
+
 -- Select an active PR from the current repository before entering the normal
 -- open workflow, including its configured checkout policy.
 function M.select_pr()
