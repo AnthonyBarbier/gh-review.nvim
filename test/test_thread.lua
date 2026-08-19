@@ -567,6 +567,39 @@ h.run_test("Thread: unchanged pending comment does not call GitHub", function()
   thread.close_thread_buffer()
 end)
 
+h.run_test("Thread: first inline comment records implicitly created pending review", function()
+  state.reset()
+  local pr_data = fixtures.mock_pr_data()
+  pr_data.data.repository.pullRequest.reviews.nodes = {}
+  state.set_pr(pr_data)
+  setup_diff_buffers("src/new_file.ts", 30)
+
+  thread.open_new("src/new_file.ts", 10, 10, "RIGHT", "")
+  local bufnr = state.get_thread_bufnr()
+  local reply_start = vim.b[bufnr].gh_review_reply_start
+  vim.api.nvim_buf_set_lines(bufnr, reply_start - 1, -1, false, { "New pending note" })
+
+  local api = require("gh_review.api")
+  local original_graphql = api.graphql
+  api.graphql = function(_, vars, callback)
+    callback({ data = { addPullRequestReviewThread = { thread = {
+      id = "new_thread",
+      comments = { nodes = { {
+        id = "new_comment",
+        body = vars.body,
+        pullRequestReview = { id = "implicit_pending_review", state = "PENDING" },
+      } } },
+    } } } })
+  end
+  vim.fn.maparg("<C-s>", "n", false, true).callback()
+  api.graphql = original_graphql
+
+  h.assert_equal("implicit_pending_review", state.get_pending_review_id())
+  h.assert_true(state.is_review_active(), "implicit review should become the active review")
+  h.assert_equal(-1, state.get_thread_bufnr(), "successful comment closes the editor")
+  cleanup_diff_buffers()
+end)
+
 h.run_test("Thread: multiple pending comments use a picker", function()
   state.reset()
   state.set_pr(fixtures.mock_pr_data())

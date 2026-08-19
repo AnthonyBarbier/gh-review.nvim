@@ -148,6 +148,16 @@ local function submit_new_thread(body, bufnr)
   api_mod.graphql(graphql.MUTATION_ADD_REVIEW_THREAD, vars, function(result)
     local new_thread = ((((result or {}).data or {}).addPullRequestReviewThread or {}).thread or {})
     if new_thread and new_thread.id then
+      -- GitHub creates a pending review implicitly when the first inline thread
+      -- is added without pullRequestReviewId.  Keep that server-created review
+      -- in local state so a later submit updates it instead of attempting to
+      -- create a second pending review, which GitHub rejects.
+      local comments = state.get(state.get(new_thread, "comments", {}), "nodes", {})
+      local review = state.get(comments[1] or {}, "pullRequestReview", {})
+      if state.get(review, "state", "") == "PENDING" then
+        local review_id = state.get(review, "id", "")
+        if review_id ~= "" then state.set_pending_review_id(review_id) end
+      end
       state.set_thread(new_thread.id, new_thread)
       require("gh_review.diff").refresh_signs()
       print("Comment submitted")
