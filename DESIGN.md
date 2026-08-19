@@ -93,11 +93,11 @@ lua/gh_review/
   api.lua                     Async wrapper around the gh CLI
   graphql.lua                 GraphQL query/mutation constants
   state.lua                   Centralized state management
-  files.lua                   Changed files list buffer
+  files.lua                   Changed-files picker and sequential navigation
   diff.lua                    Side-by-side diff view with extmarks and virtual text
   thread.lua                  Thread/comment buffer for viewing and replying
 syntax/
-  gh-review-files.vim         Syntax highlighting for the files list
+  gh-review-files.vim         Syntax highlighting for the files picker
   gh-review-thread.vim        Syntax highlighting for the thread buffer
 ```
 
@@ -111,8 +111,8 @@ All plugin state lives in module-local variables in `state.lua`, accessed throug
 - **Diff range**: the resolved merge base is retained separately from the active
   diff base. `:GHReviewCommits` can move the active base to a PR commit and can
   therefore restore the exact full-PR range without another metadata request.
-- **Review threads**: indexed by thread ID in a table. Threads are the central data structure — they drive sign placement, files list thread counts, and the thread buffer content.
-- **Buffer/window IDs**: files list, left diff, right diff, thread buffer and window.
+- **Review threads**: indexed by thread ID in a table. Threads are the central data structure — they drive sign placement, files-picker thread counts, and the thread buffer content.
+- **Buffer/window IDs**: files picker, left diff, right diff, thread buffer and window.
 - **UI state**: current diff path, local checkout flag, pending review ID.
 
 An `ns` namespace (via `nvim_create_namespace`) is exported for extmarks used by `diff.lua` for sign placement and virtual text.
@@ -192,27 +192,28 @@ Configures `git push` to work correctly after checkout:
 
 Each git command checks exit status and warns on failure.
 
-### Files list (`files.lua`)
+### Files picker (`files.lua`)
 
-A bottom split showing changed files with diff stats and thread counts:
+A centered floating picker showing changed files with diff stats and thread counts:
 
 ```
-https://github.com/owner/repo/pull/123: Fix the widget
-Files changed (3)
-
   +12 -3   M  src/main.rs         [2 threads]
   +45 -0   A  src/new_file.rs
   +0  -22  D  src/old_file.rs
 ```
 
-- Opens in a `botright` split, 12 lines high, with `winfixheight`.
-- Buffer type is `nofile` with `bufhidden=hide` (content survives when the window is closed and reopened via toggle).
+- Opens relative to the editor and sizes itself to its file rows. PR title and
+  active commit range appear in the floating-window title.
+- Buffer type is `nofile` with `bufhidden=wipe`; closing deletes the picker.
 - `<CR>` opens the side-by-side diff for the file under the cursor.
 - `R` refreshes threads from GitHub and rerenders.
-- `q` / `gf` closes the files list.
+- `q` / `gf` closes the files picker.
+- `:GHReviewNextFile` marks the current diff path viewed and opens the next item
+  in the active file order. It deliberately visits already-viewed files and
+  stops after marking the last file rather than wrapping.
 - `:GHReviewCommits` fetches the complete, paginated PR commit list on demand.
   Choosing commit X compares `X...head` through GitHub's compare API, updates
-  the files list from that response, and uses X as the left side of subsequent
+  the files picker from that response, and uses X as the left side of subsequent
   diffs. The chosen commit is excluded, which models "changes since my last
   review". A separate backward-paginated review query marks the commit attached
   to the current viewer's newest submitted review. A synthetic Full PR row
@@ -225,7 +226,6 @@ Files changed (3)
   before opening the conversation pane. The picker filters its stable source
   list in place with `a` (all), `u` (unresolved), and `p` (pending); empty
   filters remain open so the user can immediately choose another view.
-- When the files list closes, `wincmd =` equalizes window heights, then a scroll nudge (`Ctrl-E` / `Ctrl-Y`) in each diff window forces scrollbind viewports to update.
 
 ### Side-by-side diff (`diff.lua`)
 
@@ -309,7 +309,7 @@ All keymaps include `desc` fields, making them discoverable via which-key.nvim a
 | `]t`  | Jump to next thread sign                            |
 | `[t`  | Jump to previous thread sign                        |
 | `K`   | Preview thread at cursor (floating window)          |
-| `gf`  | Toggle the files list                               |
+| `gf`  | Toggle the files picker                             |
 | `gF`  | Go to file at cursor line (checkout only)           |
 | `q`   | Close the diff view                                 |
 
@@ -393,12 +393,12 @@ If a pending review already exists on the PR (from a previous session or the Git
 
 ### Window management
 
-Closing the files list or thread buffer frees vertical space. The plugin:
+Closing the thread buffer frees vertical space. The plugin:
 
 1. Calls `wincmd =` to equalize window heights.
 2. Visits each diff window and performs a scroll nudge (`Ctrl-E` / `Ctrl-Y`) to force Neovim to recompute the visible area in scrollbind/diff mode. Without this nudge, the viewport shows blank space where the closed window was.
 
-`:GHReviewClose` tears down everything: closes the thread buffer, diff view, and files list; wipes all `gh-review://` buffers; resets state.
+`:GHReviewClose` tears down everything: closes the thread buffer, diff view, and files picker; wipes all `gh-review://` buffers; resets state.
 
 ## Testing
 
@@ -409,7 +409,7 @@ Tests run in headless Neovim (`nvim --clean --headless`) and use a custom `run_t
 | `test_state.lua`      | State setters/getters, set_pr, threads, reset, get_participants |
 | `test_config.lua`     | Config defaults, merging, validation, keymap helpers, fold modes |
 | `test_diff_logic.lua` | Extmark placement, sign types, mtime tracking         |
-| `test_ui.lua`         | Files list rendering, toggle, close, keymaps          |
+| `test_ui.lua`         | Files picker, viewed state, sequential navigation     |
 | `test_thread.lua`     | Thread buffer rendering, metadata, close, omnifunc    |
 | `test_navigation.lua` | Extmark placement across sides, refresh, edge cases   |
 | `test_graphql.lua`    | GraphQL constant structure validation                 |
@@ -418,4 +418,5 @@ Tests run in headless Neovim (`nvim --clean --headless`) and use a custom `run_t
 Headless Neovim constraints:
 - `startinsert` crashes in headless mode; tests pass body content directly to `open_new()` instead.
 - `vim.o.hidden = true` is needed so tests can switch away from modified buffers without triggering E37.
-- `bufhidden=hide` is needed to keep buffer content alive when switching windows.
+- Scratch picker buffers use `bufhidden=wipe`, so closing their floating window
+  also releases their content and mappings.

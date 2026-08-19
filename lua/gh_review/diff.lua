@@ -449,7 +449,7 @@ local ACTIONS = {
   prev_thread  = { { "n", jump_to_prev_thread,         "Previous review thread" } },
   preview      = { { "n", preview_thread_at_cursor,    "Preview thread" } },
   toggle_files = { { "n", function() require("gh_review.files").toggle() end,
-                     "Toggle files list" } },
+                     "Toggle files picker" } },
   goto_file    = { { "n", function() M.goto_file() end, "Go to file (checkout only)" } },
   close        = { { "n", function() M.close_diff() end, "Close diff" } },
 }
@@ -515,22 +515,12 @@ local function show_diff(path, left_content, right_content, on_open)
     end
   end
 
-  -- Find target window: reuse existing right, or go above files list
+  -- Reuse the existing right-hand window when moving between files. The files
+  -- UI is now floating and is closed by M.open before layout changes begin.
   local old_right = state.get_right_bufnr()
   if old_right ~= -1 and vim.fn.bufexists(old_right) == 1 and vim.fn.bufwinid(old_right) ~= -1 then
     vim.fn.win_gotoid(vim.fn.bufwinid(old_right))
     vim.cmd("diffoff")
-  else
-    local fb = state.get_files_bufnr()
-    local files_winid = fb ~= -1 and vim.fn.bufwinid(fb) or -1
-    if files_winid ~= -1 then
-      vim.fn.win_gotoid(files_winid)
-      vim.cmd("wincmd k")
-      -- If we didn't move, files is the only window -- split above it
-      if vim.fn.win_getid() == files_winid then
-        vim.cmd("aboveleft new")
-      end
-    end
   end
 
   -- Set up the right (head) buffer.
@@ -731,6 +721,12 @@ local function fetch_contents(base_oid, head_oid, path, on_open)
 end
 
 function M.open(path, on_open)
+  -- A floating files picker must never be repurposed as a diff window. Closing
+  -- it also restores focus to the normal window that owns the diff layout.
+  local files_bufnr = state.get_files_bufnr()
+  if files_bufnr ~= -1 and vim.fn.bufwinid(files_bufnr) ~= -1 then
+    require("gh_review.files").close()
+  end
   state.set_diff_path(path)
 
   local base_oid = state.get_diff_base_oid()
@@ -824,12 +820,6 @@ function M.close_diff()
   state.set_diff_path("")
   state.set_saved_win_opts(nil)
 
-  -- Return focus to the files list
-  local fb = state.get_files_bufnr()
-  local files_winid = fb ~= -1 and vim.fn.bufwinid(fb) or -1
-  if files_winid ~= -1 then
-    vim.fn.win_gotoid(files_winid)
-  end
 end
 
 return M

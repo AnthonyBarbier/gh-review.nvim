@@ -208,7 +208,7 @@ h.run_test("Diff keymaps have desc fields", function()
   vim.cmd("bwipeout! " .. right)
 end)
 
-h.run_test("Files list keymaps have desc fields", function()
+h.run_test("Files picker keymaps have desc fields", function()
   state.reset()
 
   local bufnr = vim.fn.bufnr("gh-review://files-desc-test", true)

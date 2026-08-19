@@ -161,6 +161,7 @@ When the URL refers to a different repo than the current working directory, no c
 :GHReviewCommits        Review only changes after a chosen PR commit
 :GHReviewThreads        Pick a review thread and jump to its file and line
 <CR>                    Open a file’s side-by-side diff
+:GHReviewNextFile       Mark this file reviewed and open the next file
 ]t / [t                 Jump between review threads
 gt                      View a thread
 K                       Preview a thread (floating window)
@@ -176,7 +177,8 @@ gF                      Jump to the file with LSP (checkout only)
 |--------------------|---------------------------------------------------------------|
 | `:GHReview`        | Open a PR (auto-detect, by number, or by URL)                 |
 | `:GHReviewSelect`  | Select an active PR, with previously reviewed PRs listed first |
-| `:GHReviewFiles`   | Toggle the changed files list                                 |
+| `:GHReviewFiles`   | Toggle the changed-files picker                              |
+| `:GHReviewNextFile` | Mark the current file reviewed and advance to the next file; stop at the end |
 | `:GHReviewCommits` | Choose a commit and review only its subsequent changes; your last reviewed commit is marked |
 | `:GHReviewThreads` | Select any review thread and open its file, line, and conversation; filter with `a` (all), `u` (unresolved), or `p` (pending) |
 | `:GHReviewStart`   | Start a pending review (optional — `:GHReviewSubmit` works without it) |
@@ -184,15 +186,15 @@ gF                      Jump to the file with LSP (checkout only)
 | `:GHReviewDiscard` | Discard the pending review and all its pending comments       |
 | `:GHReviewClose`   | Close all review buffers and reset state                      |
 
-## Files list mappings
+## Files picker mappings
 
 | Key       | Action                                     |
 |-----------|--------------------------------------------|
 | `<CR>`    | Open the file’s side-by-side diff          |
 | `<Space>` | Toggle the file’s reviewed state           |
 | `R`       | Refresh review threads from GitHub         |
-| `gf`      | Close the files list                       |
-| `q`       | Close the files list                       |
+| `gf`      | Close the files picker                     |
+| `q`       | Close the files picker                     |
 
 ## Diff mappings
 
@@ -204,7 +206,7 @@ gF                      Jump to the file with LSP (checkout only)
 | `]t`  | Jump to the next review thread                        |
 | `[t`  | Jump to the previous review thread                    |
 | `K`   | Preview the thread at cursor (floating window)        |
-| `gf`  | Toggle the files list                                 |
+| `gf`  | Toggle the files picker                               |
 | `gF`  | Go to file at cursor line (checkout only)              |
 | `q`   | Close the diff view                                   |
 

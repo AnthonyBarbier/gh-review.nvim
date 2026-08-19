@@ -24,7 +24,7 @@ local function compare_files(files)
     end
     result[#result + 1] = {
       path = file.filename,
-      -- The files list and head buffer use the new name, while the base blob
+      -- The files picker and head buffer use the new name, while the base blob
       -- must be fetched under the old name for a rename in the chosen range.
       previousPath = file.previous_filename,
       additions = file.additions or 0,

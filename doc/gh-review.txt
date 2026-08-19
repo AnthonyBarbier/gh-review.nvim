@@ -87,6 +87,7 @@ A quick-start sequence for either workflow: >
     :GHReviewCommits        Optionally choose changes after a prior commit
     :GHReviewThreads        Pick a thread and jump to its file and line
     <CR>                    Open a file’s side-by-side diff
+    :GHReviewNextFile       Mark this file reviewed and open the next
     ]t / [t                 Jump between review threads
     gt                      View a thread
     gc                      Add a comment
@@ -119,13 +120,19 @@ A quick-start sequence for either workflow: >
                         Press <CR> to open, or q, <Esc>, or <C-c> to cancel.
 
                                                               *:GHReviewFiles*
-:GHReviewFiles          Toggle the changed files list buffer.
+:GHReviewFiles          Toggle the floating changed-files picker.
+
+                                                           *:GHReviewNextFile*
+:GHReviewNextFile       Mark the file currently displayed in the diff as
+                        reviewed, then open the next file in PR order.  Already
+                        reviewed files are not skipped.  On the final file, mark
+                        it reviewed and stop without wrapping.
 
                                                             *:GHReviewCommits*
 :GHReviewCommits        List every commit in the current PR and choose the
                         start of the diff range.  Selecting a commit shows
                         changes after that commit through the PR head and
-                        filters the files list to the same range.  Select
+                        filters the files picker to the same range.  Select
                         "Full PR" to restore the merge-base-to-head range.
                         The commit associated with your most recently
                         submitted review is annotated as "last reviewed" in
@@ -193,11 +200,11 @@ gs                      Create a suggestion at the cursor line (right buffer
 K                       Preview the thread at the cursor line in a floating
                         window.  Lighter than `gt` — no split, no reply
                         area.  Close with `q`, `<Esc>`, or |BufLeave|.
-gf                      Toggle the files list.
+gf                      Toggle the files picker.
 gF                      Go to the file at the cursor line (checkout workflow
                         only, right buffer only).  Closes the diff view and
                         opens the working-tree file with full LSP support.
-q                       Close the diff view, returning to the files list.
+q                       Close the diff view.
 
 ==============================================================================
 6. Signs and Virtual Text                                  *gh-review-signs*
@@ -288,24 +295,22 @@ insert mode.  The completion list includes all unique comment authors
 across all review threads.
 
 ==============================================================================
-8. Files List                                           *gh-review-files-list*
+8. Files Picker                                         *gh-review-files-list*
 
-The files list opens in a bottom split showing changed files with their
-diff stats and thread counts: >
+The files picker opens in a centered floating window showing changed files
+with their diff stats and thread counts.  PR and commit-range context appears
+in the window title: >
 
-    https://github.com/owner/repo/pull/123: Fix the widget
-    Files changed (3)
-
-      +12 -3   M  src/main.rs         [2 threads]
-      +45 -0   A  src/new_file.rs
-      +0  -22  D  src/old_file.rs
+    [ ] +12  -3    M  src/main.rs         [2 threads]
+    [ ] +45  -0    A  src/new_file.rs
+    [x] +0   -22   D  src/old_file.rs
 <
 Mappings:
 
 <CR>                    Open side-by-side diff for the file under cursor.
 <Space>                 Toggle the reviewed state of the file under cursor.
-q                       Close the files list.
-gf                      Close the files list (same as q).
+q                       Close the files picker.
+gf                      Close the files picker (same as q).
 R                       Refresh review threads from GitHub.
 
 ==============================================================================

@@ -243,9 +243,14 @@ function M.open(pr_number_str)
   end)
 end
 
--- Toggle the files list.
+-- Toggle the changed-files picker.
 function M.toggle_files()
   files.toggle()
+end
+
+-- Mark the displayed file reviewed and advance once through the PR file order.
+function M.next_file()
+  files.next_file()
 end
 
 -- Select an active PR from the current repository before entering the normal
@@ -385,7 +390,7 @@ function M.discard_review()
   end)
 end
 
--- Refresh threads from GitHub and update signs/files list.
+-- Refresh threads from GitHub and update signs/files picker.
 function M.refresh_threads()
   if state.get_pr_id() == "" then return end
 

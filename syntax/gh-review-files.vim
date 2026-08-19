@@ -2,15 +2,8 @@ if exists('b:current_syntax')
   finish
 endif
 
-" Header line 1: URL and PR title
-syntax match ghReviewURL  '\vhttps://[^ :]+' contained
-syntax match ghReviewTitle '\v: \zs.*$' contained
-syntax match ghReviewHeader '\v^https://.*$' contains=ghReviewURL,ghReviewTitle
-
-" Header line 2: Files changed (N)
-syntax match ghReviewFilesChanged '\v^Files changed \(\d+\)$'
-
-" File lines: additions, deletions, change type flag, path, thread count
+" Picker rows: reviewed state, diff stats, change flag, path, thread count.
+" PR and range context live in the floating-window title, not buffer rows.
 syntax match ghReviewAdditions '\v\+\d+' contained
 syntax match ghReviewDeletions '\v-\d+' contained
 syntax match ghReviewFlagA '\v\s\zsA\ze\s\s' contained
@@ -21,9 +14,6 @@ syntax match ghReviewFlagC '\v\s\zsC\ze\s\s' contained
 syntax match ghReviewThreads '\v\[\d+ threads?\]' contained
 syntax match ghReviewFileLine '\v^\[.\] \+.*$' contains=ghReviewAdditions,ghReviewDeletions,ghReviewFlagA,ghReviewFlagD,ghReviewFlagM,ghReviewFlagR,ghReviewFlagC,ghReviewThreads
 
-highlight default ghReviewURL ctermfg=2 guifg=#98c379 term=underline cterm=underline gui=underline
-highlight default link ghReviewTitle Title
-highlight default link ghReviewFilesChanged Comment
 highlight default ghReviewAdditions ctermfg=2 guifg=#98c379
 highlight default ghReviewDeletions ctermfg=1 guifg=#e06c75
 highlight default ghReviewFlagA ctermfg=2 guifg=#98c379
