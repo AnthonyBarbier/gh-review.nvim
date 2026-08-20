@@ -6,6 +6,12 @@ local config = require("gh_review.config")
 
 local M = {}
 
+-- Extmarks follow edits in the checkout buffer, while GitHub's thread line
+-- numbers describe the immutable reviewed commit.  Keep the thread ID beside
+-- each extmark so cursor actions can follow the visible marker after local
+-- insertions or deletions instead of consulting a now-stale API line number.
+local threads_by_extmark = {}
+
 -- Get the effective line number for a thread, falling back to originalLine
 -- for outdated threads where line is null.
 local function get_thread_line(t)
@@ -42,9 +48,11 @@ local function place_signs(path)
   -- Clear existing extmarks
   if lbuf ~= -1 and vim.fn.bufexists(lbuf) == 1 then
     vim.api.nvim_buf_clear_namespace(lbuf, state.ns, 0, -1)
+    threads_by_extmark[lbuf] = {}
   end
   if rbuf ~= -1 and vim.fn.bufexists(rbuf) == 1 then
     vim.api.nvim_buf_clear_namespace(rbuf, state.ns, 0, -1)
+    threads_by_extmark[rbuf] = {}
   end
 
   for _, t in ipairs(file_threads) do
@@ -94,16 +102,46 @@ local function place_signs(path)
           end
         end
 
-        vim.api.nvim_buf_set_extmark(target_bufnr, state.ns, line - 1, 0, {
+        local extmark_id = vim.api.nvim_buf_set_extmark(target_bufnr, state.ns, line - 1, 0, {
           sign_text = sign_text,
           sign_hl_group = sign_hl,
           virt_text = virt_text,
           virt_text_pos = "eol",
         })
+        threads_by_extmark[target_bufnr][extmark_id] = t.id
       end
     end
     ::continue::
   end
+end
+
+-- Resolve the marker at the cursor before falling back to GitHub's line data.
+-- The fallback preserves the old behavior if signs have not yet been rendered,
+-- while the extmark path is authoritative whenever the user can see a marker.
+function M.get_thread_at_cursor()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local lnum = vim.fn.line(".")
+  local marked_threads = threads_by_extmark[bufnr]
+  if marked_threads then
+    local marks = vim.api.nvim_buf_get_extmarks(bufnr, state.ns, 0, -1, { details = true })
+    for _, mark in ipairs(marks) do
+      local details = mark[4] or {}
+      local thread_id = marked_threads[mark[1]]
+      if mark[2] + 1 == lnum and details.sign_text and thread_id then
+        local thread = state.get_thread(thread_id)
+        if next(thread) ~= nil then return thread end
+      end
+    end
+  end
+
+  local side = get_current_side()
+  local path = state.get_diff_path()
+  for _, thread in ipairs(state.get_threads_for_file(path)) do
+    if get_thread_line(thread) == lnum and state.get(thread, "diffSide", "RIGHT") == side then
+      return thread
+    end
+  end
+  return nil
 end
 
 function M.refresh_signs()
@@ -160,22 +198,7 @@ end
 local function preview_thread_at_cursor()
   close_preview()
 
-  local lnum = vim.fn.line(".")
-  local side = get_current_side()
-  local path = state.get_diff_path()
-  local file_threads = state.get_threads_for_file(path)
-
-  local t
-  for _, thread in ipairs(file_threads) do
-    local thread_line = get_thread_line(thread)
-    if thread_line > 0 then
-      local thread_side = state.get(thread, "diffSide", "RIGHT")
-      if thread_line == lnum and thread_side == side then
-        t = thread
-        break
-      end
-    end
-  end
+  local t = M.get_thread_at_cursor()
 
   if not t then
     print("No thread at this line")
@@ -255,20 +278,10 @@ local function preview_thread_at_cursor()
 end
 
 local function open_thread_at_cursor()
-  local lnum = vim.fn.line(".")
-  local side = get_current_side()
-  local path = state.get_diff_path()
-  local file_threads = state.get_threads_for_file(path)
-
-  for _, t in ipairs(file_threads) do
-    local thread_line = get_thread_line(t)
-    if thread_line > 0 then
-      local thread_side = state.get(t, "diffSide", "RIGHT")
-      if thread_line == lnum and thread_side == side then
-        require("gh_review.thread").open(t.id)
-        return
-      end
-    end
+  local thread = M.get_thread_at_cursor()
+  if thread then
+    require("gh_review.thread").open(thread.id)
+    return
   end
 
   print("No thread at this line")

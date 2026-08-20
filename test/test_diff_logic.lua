@@ -308,6 +308,35 @@ h.run_test("Extmarks carry virtual text with author and body", function()
   vim.cmd("bwipeout! " .. right)
 end)
 
+h.run_test("Thread lookup follows its extmark after checkout edits", function()
+  state.reset()
+
+  vim.cmd("enew")
+  local left = setup_buffer("gh-review://LEFT/src/moved_thread.ts", 30)
+  state.set_left_bufnr(left)
+  vim.cmd("enew")
+  local right = setup_buffer("gh-review://RIGHT/src/moved_thread.ts", 30)
+  state.set_right_bufnr(right)
+  state.set_diff_path("src/moved_thread.ts")
+
+  state.set_threads({
+    { id = "moved", isResolved = false, isOutdated = false, line = 10, originalLine = 10, startLine = vim.NIL, originalStartLine = vim.NIL, diffSide = "RIGHT", path = "src/moved_thread.ts", comments = { nodes = { { id = "c1", body = "Follow me", author = { login = "alice" }, createdAt = "2025-01-15T10:30:00Z", pullRequestReview = { id = "r1", state = "COMMENTED" } } } } },
+  })
+
+  diff.refresh_signs()
+  vim.bo[right].modifiable = true
+  vim.api.nvim_buf_set_lines(right, 0, 0, false, { "inserted 1", "inserted 2" })
+  vim.bo[right].modifiable = false
+  vim.api.nvim_win_set_cursor(0, { 12, 0 })
+
+  local thread = diff.get_thread_at_cursor()
+  h.assert_equal("moved", thread and thread.id,
+    "cursor actions should use the marker's edited position, not GitHub's original line")
+
+  vim.cmd("bwipeout! " .. left)
+  vim.cmd("bwipeout! " .. right)
+end)
+
 h.run_test("Virtual text truncates long bodies to 60 chars", function()
   state.reset()
 
