@@ -43,7 +43,7 @@ git clone https://github.com/gh-tui-tools/gh-review.nvim.git
 ```
 
 No `setup()` call is required — commands register automatically. Call `setup()`
-only if you want to customize keymaps or folding.
+only if you want to customize the selector, keymaps, or folding.
 
 ## Configuration
 
@@ -52,6 +52,7 @@ only if you want to customize keymaps or folding.
 ```lua
 require("gh_review").setup({
   checkout = "prompt", -- "always", "prompt", or "never"
+  label = "",          -- only show PRs with this label in :GHReviewSelect
   fold = { enabled = true, level = 0 },
   keymaps = {
     diff = {
@@ -121,6 +122,17 @@ but its branch is not checked out: `"always"` checks it out without asking,
 read-only no-checkout workflow. Cross-repository URL reviews never attempt to
 check out into an unrelated working tree.
 
+`label` filters `:GHReviewSelect` to pull requests carrying that label. Label
+matching is case-insensitive. Leave it empty (the default) to list every active
+pull request. With lazy.nvim, for example:
+
+```lua
+{
+  "gh-tui-tools/gh-review.nvim",
+  opts = { label = "needs review" },
+}
+```
+
 Neovim’s `:diffthis` sets `foldmethod=diff` by itself, so disabling folding
 means the plugin actively sets `nofoldenable` once. After that it leaves
 folding alone entirely — including declining to restore `foldmethod` if
@@ -178,7 +190,7 @@ gF                      Jump to the file with LSP (checkout only)
 | Command            | Description                                                   |
 |--------------------|---------------------------------------------------------------|
 | `:GHReview`        | Open a PR (auto-detect, by number, or by URL)                 |
-| `:GHReviewSelect`  | Select an active PR, with previously reviewed PRs listed first |
+| `:GHReviewSelect`  | Select an active PR, optionally filtered by the configured label |
 | `:GHReviewFiles`   | Toggle the changed-files picker                              |
 | `:GHReviewNextFile` | Advance to the next file without changing viewed state; stop at the end |
 | `:GHReviewPrevFile` | Move to the previous file without changing viewed state; stop at the start |

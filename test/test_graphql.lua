@@ -72,6 +72,8 @@ h.run_test("QUERY_OPEN_PULL_REQUESTS filters viewer reviews and paginates", func
   h.assert_match("states: OPEN", q)
   h.assert_match("UPDATED_AT", q)
   h.assert_match("author: %$viewer", q)
+  h.assert_match("labels", q)
+  h.assert_match("name", q)
   h.assert_match("hasNextPage", q)
   h.assert_match("totalCount", q)
 end)

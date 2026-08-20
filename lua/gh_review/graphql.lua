@@ -191,6 +191,9 @@ M.QUERY_OPEN_PULL_REQUESTS = [[
           updatedAt
           isDraft
           author { login }
+          labels(first: 100) {
+            nodes { name }
+          }
           reviews(
             first: 1,
             author: $viewer,

@@ -3,6 +3,7 @@
 local api_mod = require("gh_review.api")
 local graphql = require("gh_review.graphql")
 local state = require("gh_review.state")
+local config = require("gh_review.config")
 
 local M = {}
 local picker_bufnr = -1
@@ -38,6 +39,21 @@ local function sort_prs(prs)
     if left_updated ~= right_updated then return left_updated > right_updated end
     return state.get(left, "number", 0) > state.get(right, "number", 0)
   end)
+end
+
+local function has_configured_label(pr)
+  local wanted = config.options.label
+  if wanted == "" then return true end
+
+  -- GitHub label names are case-insensitive. Filter after fetching so the
+  -- existing pagination and reviewed-first ordering remain one shared path
+  -- for configured and unconfigured selectors.
+  wanted = wanted:lower()
+  local labels = state.get(state.get(pr, "labels", {}), "nodes", {})
+  for _, label in ipairs(labels) do
+    if state.get(label, "name", ""):lower() == wanted then return true end
+  end
+  return false
 end
 
 local function open_picker(prs)
@@ -109,9 +125,11 @@ local function fetch_open_prs(viewer, callback)
       local repo = state.get(data, "repository", {})
       local connection = state.get(repo, "pullRequests", {})
       for _, pr in ipairs(state.get(connection, "nodes", {})) do
-        local reviews = state.get(pr, "reviews", {})
-        pr.reviewed = state.get(reviews, "totalCount", 0) > 0
-        prs[#prs + 1] = pr
+        if has_configured_label(pr) then
+          local reviews = state.get(pr, "reviews", {})
+          pr.reviewed = state.get(reviews, "totalCount", 0) > 0
+          prs[#prs + 1] = pr
+        end
       end
       local page_info = state.get(connection, "pageInfo", {})
       if state.get(page_info, "hasNextPage", false) then

@@ -7,6 +7,10 @@ local M = {}
 
 M.defaults = {
   checkout = "prompt",
+  -- An empty label preserves the unfiltered selector. Keeping this as a
+  -- string (rather than nil) also makes the default visible to lazy.nvim's
+  -- conventional `opts` table and keeps repeated setup calls predictable.
+  label = "",
   fold = { enabled = true, level = 0 },
   keymaps = {
     diff = {
@@ -115,6 +119,15 @@ local function validate_checkout(checkout)
   return true
 end
 
+local function validate_label(label)
+  if label == nil then return true end
+  if type(label) ~= "string" then
+    warn("label must be a string")
+    return false
+  end
+  return true
+end
+
 -- Accept `fold = false` as shorthand for `fold = { enabled = false }`.
 local function normalize(opts)
   opts = vim.deepcopy(opts or {})
@@ -131,14 +144,15 @@ function M.setup(opts)
 
   local ok = true
   for key in pairs(opts) do
-    if key ~= "checkout" and key ~= "fold" and key ~= "keymaps" then
-      warn(string.format("unknown option %q (expected checkout, fold, or keymaps)", key))
+    if key ~= "checkout" and key ~= "label" and key ~= "fold" and key ~= "keymaps" then
+      warn(string.format("unknown option %q (expected checkout, label, fold, or keymaps)", key))
       ok = false
     end
   end
   if not validate_fold(opts.fold) then ok = false end
   if not validate_keymaps(opts.keymaps) then ok = false end
   if not validate_checkout(opts.checkout) then ok = false end
+  if not validate_label(opts.label) then ok = false end
   if not ok then return end
 
   M.options = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts)
