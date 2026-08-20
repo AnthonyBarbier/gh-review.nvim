@@ -52,6 +52,7 @@ M.QUERY_PR_DETAILS = [[
                 }
                 reactionGroups {
                   content
+                  viewerHasReacted
                   reactors(first: 0) {
                     totalCount
                   }
@@ -100,6 +101,7 @@ M.QUERY_REVIEW_THREADS = [[
                 }
                 reactionGroups {
                   content
+                  viewerHasReacted
                   reactors(first: 0) {
                     totalCount
                   }
@@ -205,6 +207,38 @@ M.QUERY_OPEN_PULL_REQUESTS = [[
         pageInfo {
           hasNextPage
           endCursor
+        }
+      }
+    }
+  }
+]]
+
+-- Return the complete reaction summary so the thread buffer can update its
+-- local comment immediately after a toggle without refetching every thread.
+M.MUTATION_ADD_REACTION = [[
+  mutation($subjectId: ID!, $content: ReactionContent!) {
+    addReaction(input: {subjectId: $subjectId, content: $content}) {
+      subject {
+        id
+        reactionGroups {
+          content
+          viewerHasReacted
+          reactors(first: 0) { totalCount }
+        }
+      }
+    }
+  }
+]]
+
+M.MUTATION_REMOVE_REACTION = [[
+  mutation($subjectId: ID!, $content: ReactionContent!) {
+    removeReaction(input: {subjectId: $subjectId, content: $content}) {
+      subject {
+        id
+        reactionGroups {
+          content
+          viewerHasReacted
+          reactors(first: 0) { totalCount }
         }
       }
     }

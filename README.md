@@ -77,6 +77,8 @@ require("gh_review").setup({
       submit       = "<C-s>",
       resolve      = "<C-r>",
       delete_comment = "<C-d>",
+      thumbs_up    = "g+",
+      thumbs_down  = "g-",
       close        = "q",
       close_insert = "<C-q>",
     },
@@ -233,6 +235,8 @@ gF                      Jump to the file with LSP (checkout only)
 | `Ctrl-S` | Submit the reply                              |
 | `Ctrl-R` | Toggle resolved/unresolved                    |
 | `Ctrl-D` | Delete the pending comment being edited       |
+| `g+`     | Toggle 👍 on the comment under the cursor     |
+| `g-`     | Toggle 👎 on the comment under the cursor     |
 | `q`      | Close the thread buffer                       |
 | `Ctrl-Q` | Close the thread buffer (works in insert mode)|
 | `Ctrl-X Ctrl-O` | Complete `@`-mention from thread participants |
@@ -247,7 +251,9 @@ gF                      Jump to the file with LSP (checkout only)
 
 Each sign is accompanied by virtual text at end-of-line showing the first comment’s author and a truncated body — giving at-a-glance context without opening the thread.
 
-Comment reactions are displayed as emoji with counts after each comment body in the thread buffer and floating preview.
+Comment reactions are displayed as emoji with counts after each comment body in
+the thread buffer and floating preview. In the thread buffer, place the cursor
+on a comment and press `g+` or `g-` to toggle your thumbs-up or thumbs-down.
 
 Comments saved in the active pending review are editable. Opening a thread
 loads its pending comment into the reply area; if the thread has several,
@@ -287,7 +293,7 @@ Returns `""` when no review is active, or a summary like `PR #42 · reviewing ·
 | **Notifications**                | No (non-goal)       | No (non-goal)       | No                  | Yes                 | Yes                 |
 | **Discussions**                  | No (non-goal)       | No (non-goal)       | No                  | No                  | Yes                 |
 | **Actions/Workflows**            | No (non-goal)       | No (non-goal)       | No                  | No                  | Yes                 |
-| **Reactions**                    | No (non-goal)       | No (non-goal)       | No                  | No                  | Yes                 |
+| **Reactions**                    | 👍 / 👎 toggles      | No (non-goal)       | No                  | No                  | Yes                 |
 | **Dependencies**                 | `gh` CLI            | `gh` CLI            | `gh` CLI            | `gh` CLI, litee.nvim| `gh` CLI, plenary.nvim, picker |
 
 [gh-review.vim]: https://github.com/gh-tui-tools/gh-review.vim

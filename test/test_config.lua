@@ -26,6 +26,8 @@ h.run_test("Config: defaults are present and correctly shaped", function()
   h.assert_equal("<Space>", config.options.keymaps.files.toggle_viewed)
   h.assert_equal("<C-s>", config.options.keymaps.thread.submit)
   h.assert_equal("<C-d>", config.options.keymaps.thread.delete_comment)
+  h.assert_equal("g+", config.options.keymaps.thread.thumbs_up)
+  h.assert_equal("g-", config.options.keymaps.thread.thumbs_down)
   h.assert_equal("<C-q>", config.options.keymaps.thread.close_insert)
 end)
 

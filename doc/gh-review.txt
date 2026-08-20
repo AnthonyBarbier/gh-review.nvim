@@ -249,8 +249,9 @@ counts, for example:
 
   👍 3  🎉 1
 
-Reactions are read-only — the plugin does not provide a way to add or
-remove reactions.
+In the thread buffer, place the cursor anywhere on a comment and press `g+` or
+`g-` to toggle your thumbs-up or thumbs-down reaction.  Other reaction types
+remain display-only.
 
 Signs are placed on the appropriate side (left or right buffer) depending on
 the thread’s diff side.  For outdated threads where the line number is no
@@ -295,6 +296,8 @@ CTRL-S                  Submit the reply text (below the separator line).
 CTRL-R                  Resolve or unresolve the thread.
 CTRL-D                  Delete the pending comment being edited, after
                         confirmation.
+g+                      Toggle thumbs-up on the comment under the cursor.
+g-                      Toggle thumbs-down on the comment under the cursor.
 q                       Close the thread buffer.
 CTRL-Q                  Close the thread buffer (works in insert mode too).
 
@@ -416,6 +419,8 @@ Defaults, by surface: >lua
       submit       = "<C-s>",
       resolve      = "<C-r>",
       delete_comment = "<C-d>",
+      thumbs_up    = "g+",
+      thumbs_down  = "g-",
       close        = "q",
       close_insert = "<C-q>",
     },

@@ -6,6 +6,7 @@ local graphql = require("gh_review.graphql")
 local config = require("gh_review.config")
 
 local M = {}
+local show_thread
 
 local function format_date(iso_date)
   -- "2024-01-15T10:30:00Z" -> "2024-01-15"
@@ -404,6 +405,89 @@ local function enforce_read_only()
   end
 end
 
+local function comment_at_cursor(bufnr)
+  local line = vim.api.nvim_win_get_cursor(0)[1]
+  local ranges = vim.b[bufnr].gh_review_comment_ranges or {}
+  local thread_id = vim.b[bufnr].gh_review_thread_id or ""
+  local thread = state.get_thread(thread_id)
+  local comments = state.get(state.get(thread, "comments", {}), "nodes", {})
+
+  -- Rendered line ranges make wrapped and multi-line comment bodies behave as
+  -- one reaction target. They are stored by comment ID rather than table
+  -- identity because a later GitHub refresh replaces the state tables.
+  for _, range in ipairs(ranges) do
+    if line >= range.start_line and line <= range.end_line then
+      for _, comment in ipairs(comments) do
+        if state.get(comment, "id", "") == range.comment_id then
+          return comment, range, thread
+        end
+      end
+    end
+  end
+  return nil
+end
+
+local function toggle_reaction(content)
+  return function()
+    local bufnr = state.get_thread_bufnr()
+    if bufnr == -1 or vim.api.nvim_get_current_buf() ~= bufnr then return end
+    local comment, range, thread = comment_at_cursor(bufnr)
+    if not comment then
+      vim.notify("[gh-review] Place the cursor on a comment to react", vim.log.levels.WARN)
+      return
+    end
+
+    local viewer_has_reacted = false
+    for _, group in ipairs(state.get(comment, "reactionGroups", {})) do
+      if state.get(group, "content", "") == content then
+        viewer_has_reacted = state.get(group, "viewerHasReacted", false)
+        break
+      end
+    end
+    local mutation = viewer_has_reacted
+        and graphql.MUTATION_REMOVE_REACTION or graphql.MUTATION_ADD_REACTION
+    local payload_key = viewer_has_reacted and "removeReaction" or "addReaction"
+    local cursor_offset = vim.api.nvim_win_get_cursor(0)[1] - range.start_line
+
+    api_mod.graphql(mutation, {
+      subjectId = state.get(comment, "id", ""),
+      content = content,
+    }, function(result, err)
+      if err then return end
+      local payload = state.get(state.get(result, "data", {}), payload_key, {})
+      local subject = state.get(payload, "subject", {})
+      if state.get(subject, "id", "") == "" then
+        vim.notify("[gh-review] Failed to update reaction", vim.log.levels.ERROR)
+        return
+      end
+
+      comment.reactionGroups = state.get(subject, "reactionGroups", {})
+      state.set_thread(state.get(thread, "id", ""), thread)
+
+      -- Redraw only if the same editor is still open. Preserve unsaved reply
+      -- text and the cursor's position within the selected comment while the
+      -- reaction count gains or loses a display line.
+      if state.get_thread_bufnr() == bufnr and vim.fn.bufexists(bufnr) == 1 then
+        local reply_start = vim.b[bufnr].gh_review_reply_start or -1
+        local reply_body = get_reply_text(bufnr, reply_start)
+        local edit_id = vim.b[bufnr].gh_review_edit_comment_id or ""
+        local edit_original_body = vim.b[bufnr].gh_review_edit_original_body or ""
+        local edit_comment
+        for _, candidate in ipairs(state.get(state.get(thread, "comments", {}), "nodes", {})) do
+          if state.get(candidate, "id", "") == edit_id then edit_comment = candidate break end
+        end
+        show_thread(thread, edit_comment, {
+          reply_body = reply_body,
+          comment_id = state.get(comment, "id", ""),
+          comment_offset = cursor_offset,
+          edit_original_body = edit_original_body,
+        })
+      end
+      print(viewer_has_reacted and "Reaction removed" or "Reaction added")
+    end)
+  end
+end
+
 -- Action declaration for the thread buffer. `submit` and `close_insert` each
 -- own two mappings with different handlers: the insert-mode variants leave
 -- insert mode first. M.close_thread_buffer is referenced through a closure
@@ -415,6 +499,8 @@ local ACTIONS = {
   },
   resolve = { { "n", toggle_resolve, "Toggle resolved" } },
   delete_comment = { { "n", delete_pending_comment, "Delete pending comment" } },
+  thumbs_up = { { "n", toggle_reaction("THUMBS_UP"), "Toggle thumbs-up reaction" } },
+  thumbs_down = { { "n", toggle_reaction("THUMBS_DOWN"), "Toggle thumbs-down reaction" } },
   close   = { { "n", function() M.close_thread_buffer() end, "Close thread" } },
   close_insert = {
     { "n", function() M.close_thread_buffer() end, "Close thread" },
@@ -444,7 +530,7 @@ function M.omnifunc(findstart, base)
   return matches
 end
 
-local function show_thread(t, edit_comment)
+show_thread = function(t, edit_comment, render_state)
   -- Close existing thread buffer if open
   M.close_thread_buffer()
 
@@ -463,6 +549,7 @@ local function show_thread(t, edit_comment)
 
   -- Build buffer content
   local lines = {}
+  local comment_ranges = {}
 
   if is_new then
     lines[#lines + 1] = string.format("New comment on %s:%d  [New]", path, line_num)
@@ -493,6 +580,7 @@ local function show_thread(t, edit_comment)
 
   -- Show existing comments
   for _, c in ipairs(comments) do
+    local comment_start = #lines + 1
     local author_obj = state.get(c, "author", {})
     local author = state.get(author_obj, "login", "unknown")
     local created = format_date(state.get(c, "createdAt", ""))
@@ -507,6 +595,11 @@ local function show_thread(t, edit_comment)
     if reaction_line then
       lines[#lines + 1] = reaction_line
     end
+    comment_ranges[#comment_ranges + 1] = {
+      comment_id = state.get(c, "id", ""),
+      start_line = comment_start,
+      end_line = #lines,
+    }
     lines[#lines + 1] = ""
   end
 
@@ -517,7 +610,10 @@ local function show_thread(t, edit_comment)
   local reply_start = #lines
 
   local initial_body = state.get(t, "_initial_body", "")
-  local reply_body = edit_comment and state.get(edit_comment, "body", "") or initial_body
+  local reply_body = render_state and render_state.reply_body
+  if reply_body == nil then
+    reply_body = edit_comment and state.get(edit_comment, "body", "") or initial_body
+  end
   if reply_body ~= "" then
     local body_lines = vim.split(reply_body, "\n", { plain = true })
     for _, bl in ipairs(body_lines) do
@@ -557,9 +653,12 @@ local function show_thread(t, edit_comment)
   vim.b[bufnr].gh_review_is_new = is_new
   vim.b[bufnr].gh_review_is_resolved = is_resolved
   vim.b[bufnr].gh_review_edit_comment_id = edit_comment and edit_comment.id or ""
+  vim.b[bufnr].gh_review_comment_ranges = comment_ranges
   -- Compare normalized buffer text on save so merely opening an editable
   -- pending comment never sends a redundant update mutation.
-  vim.b[bufnr].gh_review_edit_original_body = edit_comment and get_reply_text(bufnr, reply_start) or ""
+  vim.b[bufnr].gh_review_edit_original_body = render_state
+      and render_state.edit_original_body
+      or (edit_comment and state.get(edit_comment, "body", "") or "")
 
   -- Store the first comment id (needed for REST reply)
   if #comments > 0 then
@@ -588,6 +687,19 @@ local function show_thread(t, edit_comment)
 
   -- Position cursor at the reply area
   local total_lines = vim.api.nvim_buf_line_count(bufnr)
+  if render_state and render_state.comment_id then
+    for _, range in ipairs(comment_ranges) do
+      if range.comment_id == render_state.comment_id then
+        local target = range.start_line + (render_state.comment_offset or 0)
+        target = math.max(range.start_line, math.min(target, range.end_line))
+        vim.api.nvim_win_set_cursor(0, { target, 0 })
+        -- The reaction redraw deliberately lands back in the read-only header;
+        -- apply that state synchronously instead of waiting for CursorMoved.
+        vim.bo[bufnr].modifiable = false
+        return
+      end
+    end
+  end
   if reply_body ~= "" then
     local target = math.min(reply_start + 2, total_lines)
     vim.api.nvim_win_set_cursor(0, { target, 0 })

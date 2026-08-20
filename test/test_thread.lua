@@ -726,10 +726,131 @@ h.run_test("Thread: reply separator text follows configured keys", function()
   config.reset()
 end)
 
+h.run_test("Thread: thumbs-up mapping adds a reaction and preserves a draft reply", function()
+  local config = require("gh_review.config")
+  local api = require("gh_review.api")
+  local gql = require("gh_review.graphql")
+  config.reset()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  state.set_threads(fixtures.mock_thread_nodes())
+  thread.open("thread_1")
+
+  local bufnr = state.get_thread_bufnr()
+  local ranges = vim.b[bufnr].gh_review_comment_ranges
+  vim.bo[bufnr].modifiable = true
+  vim.api.nvim_buf_set_lines(bufnr, -1, -1, false, { "draft reply" })
+  vim.api.nvim_win_set_cursor(0, { ranges[1].start_line, 0 })
+
+  local original_graphql = api.graphql
+  local captured = {}
+  api.graphql = function(mutation, vars, callback)
+    captured.mutation = mutation
+    captured.vars = vars
+    callback({ data = { addReaction = { subject = {
+      id = vars.subjectId,
+      reactionGroups = {
+        { content = "THUMBS_UP", viewerHasReacted = true, reactors = { totalCount = 1 } },
+      },
+    } } } })
+  end
+  vim.fn.maparg("g+", "n", false, true).callback()
+  api.graphql = original_graphql
+
+  h.assert_equal(gql.MUTATION_ADD_REACTION, captured.mutation)
+  h.assert_equal("comment_1", captured.vars.subjectId)
+  h.assert_equal("THUMBS_UP", captured.vars.content)
+  bufnr = state.get_thread_bufnr()
+  local text = table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "\n")
+  h.assert_match("👍 1", text)
+  h.assert_match("draft reply", text, "reaction redraw preserves unsaved reply text")
+  thread.close_thread_buffer()
+  config.reset()
+end)
+
+h.run_test("Thread: thumbs-down mapping removes the viewer's reaction", function()
+  local config = require("gh_review.config")
+  local api = require("gh_review.api")
+  local gql = require("gh_review.graphql")
+  config.reset()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  local nodes = fixtures.mock_thread_nodes()
+  nodes[1].comments.nodes[1].reactionGroups = {
+    { content = "THUMBS_DOWN", viewerHasReacted = true, reactors = { totalCount = 1 } },
+  }
+  state.set_threads(nodes)
+  thread.open("thread_1")
+
+  local bufnr = state.get_thread_bufnr()
+  local ranges = vim.b[bufnr].gh_review_comment_ranges
+  vim.api.nvim_win_set_cursor(0, { ranges[1].start_line, 0 })
+  local original_graphql = api.graphql
+  local captured = {}
+  api.graphql = function(mutation, vars, callback)
+    captured.mutation = mutation
+    captured.vars = vars
+    callback({ data = { removeReaction = { subject = {
+      id = vars.subjectId,
+      reactionGroups = {},
+    } } } })
+  end
+  vim.fn.maparg("g-", "n", false, true).callback()
+  api.graphql = original_graphql
+
+  h.assert_equal(gql.MUTATION_REMOVE_REACTION, captured.mutation)
+  h.assert_equal("THUMBS_DOWN", captured.vars.content)
+  local text = table.concat(vim.api.nvim_buf_get_lines(state.get_thread_bufnr(), 0, -1, false), "\n")
+  h.assert_true(text:find("👎", 1, true) == nil, "removed reaction disappears")
+  thread.close_thread_buffer()
+  config.reset()
+end)
+
+h.run_test("Thread: reaction redraw preserves pending-comment edit baseline", function()
+  local config = require("gh_review.config")
+  local api = require("gh_review.api")
+  config.reset()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  state.set_threads(fixtures.mock_thread_nodes())
+  thread.open("thread_4")
+
+  local bufnr = state.get_thread_bufnr()
+  local original_body = vim.b[bufnr].gh_review_edit_original_body
+  vim.bo[bufnr].modifiable = true
+  local reply_start = vim.b[bufnr].gh_review_reply_start
+  vim.api.nvim_buf_set_lines(bufnr, reply_start, -1, false, { "edited pending note" })
+  local ranges = vim.b[bufnr].gh_review_comment_ranges
+  vim.api.nvim_win_set_cursor(0, { ranges[1].start_line, 0 })
+
+  local original_graphql = api.graphql
+  api.graphql = function(_, vars, callback)
+    callback({ data = { addReaction = { subject = {
+      id = vars.subjectId,
+      reactionGroups = {
+        { content = "THUMBS_UP", viewerHasReacted = true, reactors = { totalCount = 1 } },
+      },
+    } } } })
+  end
+  vim.fn.maparg("g+", "n", false, true).callback()
+  api.graphql = original_graphql
+
+  bufnr = state.get_thread_bufnr()
+  h.assert_equal(original_body, vim.b[bufnr].gh_review_edit_original_body,
+    "reaction redraw must not make an unsaved edit look already saved")
+  local text = table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "\n")
+  h.assert_match("edited pending note", text)
+  thread.close_thread_buffer()
+  config.reset()
+end)
+
 h.run_test("Thread: keymaps honour configuration", function()
   local config = require("gh_review.config")
   config.reset()
-  config.setup({ keymaps = { thread = { resolve = "Z", delete_comment = "X", close_insert = false } } })
+  config.setup({ keymaps = { thread = {
+    resolve = "Z", delete_comment = "X", thumbs_up = "U", thumbs_down = false,
+    close_insert = false,
+  } } })
 
   state.reset()
   state.set_pr(fixtures.mock_pr_data())
@@ -745,6 +866,8 @@ h.run_test("Thread: keymaps honour configuration", function()
 
   h.assert_true(mapped("n", "Z") ~= nil, "resolve remapped")
   h.assert_true(mapped("n", "X") ~= nil, "delete comment remapped")
+  h.assert_true(mapped("n", "U") ~= nil, "thumbs up remapped")
+  h.assert_true(mapped("n", "g-") == nil, "thumbs down disabled")
   h.assert_true(mapped("n", "q") ~= nil, "close default intact")
   h.assert_true(mapped("i", "<C-Q>") == nil, "close_insert disabled in insert mode")
   h.assert_true(mapped("i", "<C-S>") ~= nil, "submit still bound in insert mode")

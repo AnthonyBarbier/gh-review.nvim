@@ -35,6 +35,8 @@ M.defaults = {
       submit       = "<C-s>",
       resolve      = "<C-r>",
       delete_comment = "<C-d>",
+      thumbs_up    = "g+",
+      thumbs_down  = "g-",
       close        = "q",
       close_insert = "<C-q>",
     },

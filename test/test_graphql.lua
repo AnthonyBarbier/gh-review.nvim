@@ -10,6 +10,8 @@ local constants = {
   { name = "QUERY_MY_LAST_REVIEW", val = graphql.QUERY_MY_LAST_REVIEW },
   { name = "QUERY_VIEWER_LOGIN", val = graphql.QUERY_VIEWER_LOGIN },
   { name = "QUERY_OPEN_PULL_REQUESTS", val = graphql.QUERY_OPEN_PULL_REQUESTS },
+  { name = "MUTATION_ADD_REACTION", val = graphql.MUTATION_ADD_REACTION },
+  { name = "MUTATION_REMOVE_REACTION", val = graphql.MUTATION_REMOVE_REACTION },
   { name = "MUTATION_START_REVIEW", val = graphql.MUTATION_START_REVIEW },
   { name = "MUTATION_SUBMIT_REVIEW", val = graphql.MUTATION_SUBMIT_REVIEW },
   { name = "MUTATION_ADD_REVIEW_THREAD", val = graphql.MUTATION_ADD_REVIEW_THREAD },
@@ -80,6 +82,8 @@ end)
 
 h.run_test("Mutations contain mutation keyword", function()
   h.assert_match("mutation", graphql.MUTATION_START_REVIEW)
+  h.assert_match("mutation", graphql.MUTATION_ADD_REACTION)
+  h.assert_match("mutation", graphql.MUTATION_REMOVE_REACTION)
   h.assert_match("mutation", graphql.MUTATION_SUBMIT_REVIEW)
   h.assert_match("mutation", graphql.MUTATION_ADD_REVIEW_THREAD)
   h.assert_match("mutation", graphql.MUTATION_ADD_REVIEW_COMMENT)
@@ -88,6 +92,15 @@ h.run_test("Mutations contain mutation keyword", function()
   h.assert_match("mutation", graphql.MUTATION_RESOLVE_THREAD)
   h.assert_match("mutation", graphql.MUTATION_UNRESOLVE_THREAD)
   h.assert_match("mutation", graphql.MUTATION_CREATE_AND_SUBMIT_REVIEW)
+end)
+
+h.run_test("Reaction queries include viewer state and updated counts", function()
+  h.assert_match("viewerHasReacted", graphql.QUERY_PR_DETAILS)
+  h.assert_match("viewerHasReacted", graphql.QUERY_REVIEW_THREADS)
+  h.assert_match("addReaction", graphql.MUTATION_ADD_REACTION)
+  h.assert_match("removeReaction", graphql.MUTATION_REMOVE_REACTION)
+  h.assert_match("reactionGroups", graphql.MUTATION_ADD_REACTION)
+  h.assert_match("totalCount", graphql.MUTATION_REMOVE_REACTION)
 end)
 
 h.run_test("Pending comment mutations target a review comment ID", function()
