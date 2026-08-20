@@ -64,12 +64,14 @@ local function open_picker(prs)
   end
 
   sort_prs(prs)
-  local lines = {}
-  local max_width = vim.fn.strdisplaywidth("Select active PR")
+  local max_width = vim.fn.strdisplaywidth("Select active PR · reviewed by me · i/l/a")
   for _, pr in ipairs(prs) do
     local line = format_pr(pr)
-    lines[#lines + 1] = line
     max_width = math.max(max_width, vim.fn.strdisplaywidth(line))
+  end
+  if config.options.label ~= "" then
+    max_width = math.max(max_width,
+      vim.fn.strdisplaywidth("Select active PR · label: " .. config.options.label .. " · i/l/a"))
   end
 
   picker_bufnr = vim.api.nvim_create_buf(false, true)
@@ -77,11 +79,9 @@ local function open_picker(prs)
   vim.bo[picker_bufnr].bufhidden = "wipe"
   vim.bo[picker_bufnr].swapfile = false
   vim.bo[picker_bufnr].filetype = "gh-review-prs"
-  vim.api.nvim_buf_set_lines(picker_bufnr, 0, -1, false, lines)
-  vim.bo[picker_bufnr].modifiable = false
 
   local width = math.min(max_width, math.max(1, vim.o.columns - 4))
-  local height = math.min(#lines, math.max(1, vim.o.lines - 4))
+  local height = math.min(#prs, math.max(1, vim.o.lines - 4))
   picker_winid = vim.api.nvim_open_win(picker_bufnr, true, {
     relative = "editor",
     row = math.max(0, math.floor((vim.o.lines - height) / 2) - 1),
@@ -90,14 +90,60 @@ local function open_picker(prs)
     height = height,
     style = "minimal",
     border = "rounded",
-    title = " Select active PR ",
+    title = " Select active PR · i/l/a ",
     title_pos = "center",
   })
   vim.wo[picker_winid].cursorline = true
   vim.wo[picker_winid].wrap = false
 
+  local displayed_prs = {}
+
+  local function filter_title(filter)
+    if filter == "involved" then return "reviewed by me" end
+    if filter == "label" then return "label: " .. config.options.label end
+    return "all"
+  end
+
+  local function set_filter(filter)
+    if filter == "label" and config.options.label == "" then
+      vim.notify("[gh-review] No label configured; set opts.label to use this filter", vim.log.levels.WARN)
+      return
+    end
+
+    displayed_prs = {}
+    for _, pr in ipairs(prs) do
+      if filter == "all"
+          or (filter == "involved" and pr.reviewed)
+          or (filter == "label" and has_configured_label(pr)) then
+        displayed_prs[#displayed_prs + 1] = pr
+      end
+    end
+
+    -- Keep an empty filter switchable instead of closing the picker: the user
+    -- can immediately press another filter key without refetching GitHub data.
+    local lines = {}
+    for _, pr in ipairs(displayed_prs) do lines[#lines + 1] = format_pr(pr) end
+    if #lines == 0 then lines[1] = "No matching pull requests" end
+    vim.bo[picker_bufnr].modifiable = true
+    vim.api.nvim_buf_set_lines(picker_bufnr, 0, -1, false, lines)
+    vim.bo[picker_bufnr].modifiable = false
+
+    local new_height = math.min(#lines, math.max(1, vim.o.lines - 4))
+    vim.api.nvim_win_set_config(picker_winid, {
+      relative = "editor",
+      row = math.max(0, math.floor((vim.o.lines - new_height) / 2) - 1),
+      col = math.max(0, math.floor((vim.o.columns - width) / 2)),
+      width = width,
+      height = new_height,
+      title = " Select active PR · " .. filter_title(filter) .. " · i/l/a ",
+      title_pos = "center",
+    })
+    vim.api.nvim_win_set_cursor(picker_winid, { 1, 0 })
+  end
+
   local function choose_current()
-    local pr = prs[vim.api.nvim_win_get_cursor(picker_winid)[1]]
+    local pr = displayed_prs[vim.api.nvim_win_get_cursor(picker_winid)[1]]
+    if not pr then return end
     close_picker()
     -- Reuse the normal open path so checkout policy, metadata loading, and UI
     -- initialization cannot diverge between :GHReview and :GHReviewSelect.
@@ -108,6 +154,14 @@ local function open_picker(prs)
   vim.keymap.set("n", "q", close_picker, map_opts)
   vim.keymap.set("n", "<Esc>", close_picker, map_opts)
   vim.keymap.set("n", "<C-c>", close_picker, map_opts)
+  vim.keymap.set("n", "i", function() set_filter("involved") end, map_opts)
+  vim.keymap.set("n", "l", function() set_filter("label") end, map_opts)
+  vim.keymap.set("n", "a", function() set_filter("all") end, map_opts)
+
+  -- A configured label used to filter the selector unconditionally. Starting
+  -- on that view preserves existing setups while still making all PRs one key
+  -- press away; without a label, retain the historical all-PR default.
+  set_filter(config.options.label ~= "" and "label" or "all")
 end
 
 local function fetch_open_prs(viewer, callback)
@@ -125,11 +179,9 @@ local function fetch_open_prs(viewer, callback)
       local repo = state.get(data, "repository", {})
       local connection = state.get(repo, "pullRequests", {})
       for _, pr in ipairs(state.get(connection, "nodes", {})) do
-        if has_configured_label(pr) then
-          local reviews = state.get(pr, "reviews", {})
-          pr.reviewed = state.get(reviews, "totalCount", 0) > 0
-          prs[#prs + 1] = pr
-        end
+        local reviews = state.get(pr, "reviews", {})
+        pr.reviewed = state.get(reviews, "totalCount", 0) > 0
+        prs[#prs + 1] = pr
       end
       local page_info = state.get(connection, "pageInfo", {})
       if state.get(page_info, "hasNextPage", false) then

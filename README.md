@@ -124,9 +124,10 @@ but its branch is not checked out: `"always"` checks it out without asking,
 read-only no-checkout workflow. Cross-repository URL reviews never attempt to
 check out into an unrelated working tree.
 
-`label` filters `:GHReviewSelect` to pull requests carrying that label. Label
-matching is case-insensitive. Leave it empty (the default) to list every active
-pull request. With lazy.nvim, for example:
+`label` supplies the selector's `l` filter. Label matching is case-insensitive.
+When configured, the picker starts on that filter; press `i` for pull requests
+you have reviewed or `a` for all active pull requests. With lazy.nvim, for
+example:
 
 ```lua
 {
@@ -192,7 +193,7 @@ gF                      Jump to the file with LSP (checkout only)
 | Command            | Description                                                   |
 |--------------------|---------------------------------------------------------------|
 | `:GHReview`        | Open a PR (auto-detect, by number, or by URL)                 |
-| `:GHReviewSelect`  | Select an active PR, optionally filtered by the configured label |
+| `:GHReviewSelect`  | Select an active PR; switch reviewed/label/all filters with `i`/`l`/`a` |
 | `:GHReviewFiles`   | Toggle the changed-files picker                              |
 | `:GHReviewNextFile` | Advance to the next file without changing viewed state; stop at the end |
 | `:GHReviewPrevFile` | Move to the previous file without changing viewed state; stop at the start |

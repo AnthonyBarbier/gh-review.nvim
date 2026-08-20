@@ -119,8 +119,11 @@ A quick-start sequence for either workflow: >
                         repository in a floating picker.  Pull requests you
                         previously reviewed appear first; reviewed and other
                         groups are each sorted by most recently updated.
-                        When the `label` option is non-empty, only pull requests
-                        with that label are listed (case-insensitively).
+                        Press i for pull requests you have reviewed, l for pull
+                        requests with the configured `label`, or a for all pull
+                        requests.  Label matching is case-insensitive.  A
+                        configured label is the initial filter; otherwise the
+                        picker starts with all pull requests.
                         Press <CR> to open, or q, <Esc>, or <C-c> to cancel.
 
                                                               *:GHReviewFiles*
@@ -430,9 +433,10 @@ whose PR branch is not currently checked out.  `"always"` checks out without
 asking, `"prompt"` asks first (the default), and `"never"` uses the no-checkout
 workflow.  A URL for another repository always uses the no-checkout workflow.
 
-`label` filters |:GHReviewSelect| to pull requests carrying that label.  Label
-matching is case-insensitive.  The empty default lists every active pull
-request.  lazy.nvim users can pass it directly in the plugin specification: >lua
+`label` supplies the `l` filter in |:GHReviewSelect|.  Matching is
+case-insensitive.  When configured, the picker starts on that filter; press
+`i` for pull requests you have reviewed or `a` for all active pull requests.
+lazy.nvim users can pass it directly in the plugin specification: >lua
 
     opts = { label = "needs review" }
 <
