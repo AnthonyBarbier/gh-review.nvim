@@ -82,6 +82,7 @@ is declined or fails.
 
 A quick-start sequence for either workflow: >
 
+    :GHReviewMenu           Open the review action menu
     :GHReview 123           Open PR #123 (or :GHReview {url})
     :GHReviewSelect         Pick an active PR in the current repository
     :GHReviewCommits        Optionally choose changes after a prior commit
@@ -100,6 +101,14 @@ A quick-start sequence for either workflow: >
 <
 ==============================================================================
 4. Commands                                               *gh-review-commands*
+
+                                                               *:GHReviewMenu*
+:GHReviewMenu           Open a native floating picker for the common review
+                        actions.  Press r for |:GHReview|, c for
+                        |:GHReviewCommits|, s for |:GHReviewSubmit|, f for
+                        |:GHReviewFiles|, or t for |:GHReviewThreads|.  Press
+                        <CR> to run the highlighted action, or q, <Esc>, or
+                        <C-c> to cancel.
 
                                                                    *:GHReview*
 :GHReview               With no argument, detect the PR from the current

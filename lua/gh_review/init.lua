@@ -273,6 +273,12 @@ function M.select_pr()
   require("gh_review.pr_select").open()
 end
 
+-- Open the native command palette without requiring a PR to be loaded first;
+-- individual actions retain their existing context checks and error messages.
+function M.open_menu()
+  require("gh_review.menu").open()
+end
+
 -- Choose a PR commit as the start of the reviewed range.  The selected commit
 -- itself is excluded, matching Git's commit..head semantics and the common
 -- "show me what changed since I last reviewed this commit" workflow.

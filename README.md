@@ -171,6 +171,7 @@ When the URL refers to a different repo than the current working directory, no c
 ## Quick start
 
 ```
+:GHReviewMenu           Open the review action menu
 :GHReview 123           Open PR #123
 :GHReviewSelect         Pick an active PR from the current repository
 :GHReviewCommits        Review only changes after a chosen PR commit
@@ -192,6 +193,7 @@ gF                      Jump to the file with LSP (checkout only)
 
 | Command            | Description                                                   |
 |--------------------|---------------------------------------------------------------|
+| `:GHReviewMenu`    | Open a native picker for review, commits, submit, files, and threads |
 | `:GHReview`        | Open a PR (auto-detect, by number, or by URL)                 |
 | `:GHReviewSelect`  | Select an active PR; switch reviewed/label/all filters with `i`/`l`/`a` |
 | `:GHReviewFiles`   | Toggle the changed-files picker                              |
@@ -204,6 +206,18 @@ gF                      Jump to the file with LSP (checkout only)
 | `:GHReviewSubmit`  | Submit a review (Comment / Approve / Request changes)         |
 | `:GHReviewDiscard` | Discard the pending review and all its pending comments       |
 | `:GHReviewClose`   | Close all review buffers and reset state                      |
+
+## Review menu mappings
+
+| Key | Action |
+|-----|--------|
+| `r` | Run `:GHReview` |
+| `c` | Run `:GHReviewCommits` |
+| `s` | Run `:GHReviewSubmit` |
+| `f` | Run `:GHReviewFiles` |
+| `t` | Run `:GHReviewThreads` |
+| `<CR>` | Run the highlighted action |
+| `q`, `<Esc>`, `<C-c>` | Close the menu |
 
 ## Files picker mappings
 
