@@ -193,7 +193,7 @@ gF                      Jump to the file with LSP (checkout only)
 
 | Command            | Description                                                   |
 |--------------------|---------------------------------------------------------------|
-| `:GHReviewMenu`    | Open a native picker for review, commits, submit, files, and threads |
+| `:GHReviewMenu`    | Open a native picker for PR selection and common review actions |
 | `:GHReview`        | Open a PR (auto-detect, by number, or by URL)                 |
 | `:GHReviewSelect`  | Select an active PR; switch reviewed/label/all filters with `i`/`l`/`a` |
 | `:GHReviewFiles`   | Toggle the changed-files picker                              |
@@ -212,6 +212,7 @@ gF                      Jump to the file with LSP (checkout only)
 | Key | Action |
 |-----|--------|
 | `r` | Run `:GHReview` |
+| `p` | Run `:GHReviewSelect` |
 | `c` | Run `:GHReviewCommits` |
 | `s` | Run `:GHReviewSubmit` |
 | `f` | Run `:GHReviewFiles` |

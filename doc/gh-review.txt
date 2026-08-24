@@ -104,11 +104,11 @@ A quick-start sequence for either workflow: >
 
                                                                *:GHReviewMenu*
 :GHReviewMenu           Open a native floating picker for the common review
-                        actions.  Press r for |:GHReview|, c for
-                        |:GHReviewCommits|, s for |:GHReviewSubmit|, f for
-                        |:GHReviewFiles|, or t for |:GHReviewThreads|.  Press
-                        <CR> to run the highlighted action, or q, <Esc>, or
-                        <C-c> to cancel.
+                        actions.  Press r for |:GHReview|, p for
+                        |:GHReviewSelect|, c for |:GHReviewCommits|, s for
+                        |:GHReviewSubmit|, f for |:GHReviewFiles|, or t for
+                        |:GHReviewThreads|.  Press <CR> to run the highlighted
+                        action, or q, <Esc>, or <C-c> to cancel.
 
                                                                    *:GHReview*
 :GHReview               With no argument, detect the PR from the current
