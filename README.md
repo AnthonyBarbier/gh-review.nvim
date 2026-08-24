@@ -244,6 +244,12 @@ gF                      Jump to the file with LSP (checkout only)
 | `gF`  | Go to file at cursor line (checkout only)              |
 | `q`   | Close the diff view                                   |
 
+LEFT/base buffers are listed as `gh-review://LEFT/{path}` and remain available
+if their window is closed accidentally. Use `:buffers` to find one and
+`:vert sbuffer {buffer-number}` to restore it in a split. Closing the diff with
+`q` still removes the LEFT buffer as an intentional teardown, and opening a
+different reviewed file deletes the previous file's LEFT buffer.
+
 ## Thread mappings
 
 | Key      | Action                                        |

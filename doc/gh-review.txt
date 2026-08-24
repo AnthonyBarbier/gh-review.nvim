@@ -216,6 +216,12 @@ In the no-checkout workflow, the right buffer is read-only.
 Both diff windows display a winbar showing the PR number, file path,
 side (base/head), and a short commit OID for persistent context.
 
+The LEFT/base buffer is listed as `gh-review://LEFT/{path}` and remains loaded
+if its window is closed accidentally.  Use |:buffers| to find its buffer number
+and `:vert sbuffer {number}` to bring it back in a split.  Closing the diff with
+q is an intentional teardown and removes the LEFT buffer.  Opening another
+reviewed file also deletes the previous file's LEFT buffer.
+
 DIFF MAPPINGS ~
                                                     *gh-review-diff-mappings*
 

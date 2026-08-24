@@ -473,7 +473,13 @@ local function setup_diff_buffer(bufnr, name, path, content, real_file)
     vim.bo[bufnr].bufhidden = "hide"
   else
     vim.bo[bufnr].buftype = "nofile"
-    vim.bo[bufnr].bufhidden = "wipe"
+    -- Base buffers are useful navigation targets in buffer pickers. Keep them
+    -- listed and loaded when their window is accidentally closed so `:buffer`
+    -- or `:sbuffer` can recover the exact fetched base content without another
+    -- GitHub request. Explicit diff teardown still deletes them below.
+    local is_left = name:find("gh-review://LEFT/", 1, true) == 1
+    vim.bo[bufnr].bufhidden = is_left and "hide" or "wipe"
+    vim.bo[bufnr].buflisted = is_left
     vim.bo[bufnr].swapfile = false
     vim.bo[bufnr].modifiable = true
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, content)
@@ -525,6 +531,14 @@ local function show_diff(path, left_content, right_content, on_open)
     if winid ~= -1 then
       vim.fn.win_gotoid(winid)
       vim.cmd("close")
+    end
+    -- `bufhidden=hide` keeps an accidentally closed current LEFT buffer
+    -- recoverable. Once navigation selects another path it is no longer the
+    -- current base, so delete it explicitly rather than accumulating one
+    -- listed scratch buffer for every file visited during the review.
+    if vim.api.nvim_buf_get_name(old_left) ~= left_name
+        and vim.api.nvim_buf_is_valid(old_left) then
+      vim.api.nvim_buf_delete(old_left, { force = true })
     end
   end
 
@@ -798,6 +812,11 @@ function M.close_diff()
     if winid ~= -1 then
       vim.fn.win_gotoid(winid)
       vim.cmd("close")
+    end
+    -- `q`/gF are intentional teardown paths, unlike a raw window close. Do
+    -- not leave a stale base buffer listed after the review diff is closed.
+    if vim.api.nvim_buf_is_valid(left) then
+      vim.api.nvim_buf_delete(left, { force = true })
     end
   end
 

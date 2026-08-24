@@ -484,4 +484,68 @@ h.run_test("Fold guard: ignores buffers that are not ours", function()
   config.reset()
 end)
 
+h.run_test("LEFT diff buffer stays listed and can be reopened after its window closes", function()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  state.set_changed_files({
+    { path = "README.md", additions = 1, deletions = 0, changeType = "ADDED" },
+  })
+  state.set_local_checkout(true)
+
+  diff.open("README.md")
+  h.assert_true(vim.wait(1000, function()
+    local left = state.get_left_bufnr()
+    return left ~= -1 and vim.fn.bufwinid(left) ~= -1
+  end), "diff opens synchronously scheduled buffers")
+
+  local left = state.get_left_bufnr()
+  local left_name = vim.api.nvim_buf_get_name(left)
+  h.assert_equal("gh-review://LEFT/README.md", left_name)
+  h.assert_true(vim.bo[left].buflisted, "LEFT buffer appears in :buffers")
+  h.assert_equal("hide", vim.bo[left].bufhidden, "closing its window preserves the buffer")
+
+  vim.api.nvim_win_close(vim.fn.bufwinid(left), true)
+  h.assert_true(vim.api.nvim_buf_is_valid(left), "LEFT buffer survives a raw window close")
+  h.assert_match("gh%-review://LEFT/README%.md", vim.api.nvim_exec2("buffers", { output = true }).output)
+
+  vim.cmd("aboveleft vertical sbuffer " .. left)
+  h.assert_true(vim.fn.bufwinid(left) ~= -1, ":sbuffer brings the LEFT buffer back")
+
+  diff.close_diff()
+  h.assert_false(vim.api.nvim_buf_is_valid(left), "explicit diff teardown deletes the LEFT buffer")
+  state.reset()
+end)
+
+h.run_test("Changing reviewed files deletes the previous listed LEFT buffer", function()
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  state.set_changed_files({
+    { path = "README.md", additions = 1, deletions = 0, changeType = "ADDED" },
+    { path = "LICENSE", additions = 1, deletions = 0, changeType = "ADDED" },
+  })
+  state.set_local_checkout(true)
+
+  diff.open("README.md")
+  h.assert_true(vim.wait(1000, function()
+    return state.get_left_bufnr() ~= -1 and vim.fn.bufwinid(state.get_left_bufnr()) ~= -1
+  end))
+  local previous_left = state.get_left_bufnr()
+
+  diff.open("LICENSE")
+  h.assert_true(vim.wait(1000, function()
+    local current_left = state.get_left_bufnr()
+    return current_left ~= previous_left
+        and current_left ~= -1
+        and vim.fn.bufwinid(current_left) ~= -1
+  end))
+
+  h.assert_false(vim.api.nvim_buf_is_valid(previous_left),
+    "only the current reviewed file keeps a recoverable LEFT buffer")
+  h.assert_equal("gh-review://LEFT/LICENSE",
+    vim.api.nvim_buf_get_name(state.get_left_bufnr()))
+
+  diff.close_diff()
+  state.reset()
+end)
+
 h.write_results("/tmp/gh_review_test_diff_logic.txt")
