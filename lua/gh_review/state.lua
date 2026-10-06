@@ -203,6 +203,54 @@ end
 
 -- ------- Repo detection -------
 
+-- Return the owner and repository encoded by a GitHub remote URL.  Keeping
+-- parsing separate from discovery lets get_repo_info() retry after undoing a
+-- Git insteadOf rewrite without duplicating the accepted URL formats.
+local function parse_github_remote(remote)
+  -- SCP-style SSH URL: git@github.com:owner/name.git
+  local ssh_owner, ssh_name = remote:match("git@github%.com:([^/]+)/([^/]+)")
+  if ssh_owner then
+    return ssh_owner, ssh_name:gsub("%.git$", "")
+  end
+
+  -- HTTPS and ssh:// URLs both separate the host from the path with a slash.
+  local url_owner, url_name = remote:match("github%.com/([^/]+)/([^/]+)")
+  if url_owner then
+    return url_owner, url_name:gsub("%.git$", "")
+  end
+end
+
+-- Git applies url.<base>.insteadOf by replacing a configured URL prefix with
+-- <base>.  `git remote get-url` exposes that rewritten URL, which may contain
+-- an SSH host alias (for example github-work) that is intentionally meaningful
+-- only to the user's Git/SSH configuration.  Reverse only mappings whose
+-- original value parses as GitHub, and prefer the longest matching base.  The
+-- latter mirrors Git's own longest-prefix rule and avoids guessing that every
+-- arbitrary SSH hostname is github.com.
+local function github_repo_from_instead_of(remote)
+  local obj = vim.system(
+    { "git", "config", "--null", "--get-regexp", "^url\\..*\\.insteadof$" },
+    { text = true }
+  ):wait()
+  if obj.code ~= 0 then return nil end
+
+  local best_owner, best_name, best_base_length
+  for entry in (obj.stdout or ""):gmatch("(.-)%z") do
+    -- With --null, Git separates the key and value with a newline and entries
+    -- with NUL, so URL values containing spaces remain unambiguous.
+    local key, instead_of = entry:match("^([^\n]+)\n(.*)$")
+    local base = key and key:match("^url%.(.*)%.insteadof$")
+    if base and remote:sub(1, #base) == base then
+      local candidate = instead_of .. remote:sub(#base + 1)
+      local owner, name = parse_github_remote(candidate)
+      if owner and (not best_base_length or #base > best_base_length) then
+        best_owner, best_name, best_base_length = owner, name, #base
+      end
+    end
+  end
+  return best_owner, best_name
+end
+
 function M.get_repo_info()
   local obj = vim.system({ "git", "remote", "get-url", "origin" }, { text = true }):wait()
   if obj.code ~= 0 then
@@ -211,19 +259,13 @@ function M.get_repo_info()
   end
   local remote = vim.trim(obj.stdout or "")
 
-  -- Parse SSH format: git@github.com:owner/name.git
-  local ssh_owner, ssh_name = remote:match("git@github%.com:([^/]+)/([^/]+)")
-  if ssh_owner then
-    repo_owner = ssh_owner
-    repo_name = ssh_name:gsub("%.git$", "")
-    return true
+  local owner, name = parse_github_remote(remote)
+  if not owner then
+    owner, name = github_repo_from_instead_of(remote)
   end
-
-  -- Parse HTTPS format: https://github.com/owner/name.git
-  local https_owner, https_name = remote:match("github%.com/([^/]+)/([^/]+)")
-  if https_owner then
-    repo_owner = https_owner
-    repo_name = https_name:gsub("%.git$", "")
+  if owner then
+    repo_owner = owner
+    repo_name = name
     return true
   end
 

@@ -106,7 +106,7 @@ syntax/
 All plugin state lives in module-local variables in `state.lua`, accessed through exported getter/setter functions. This includes:
 
 - **PR metadata**: id, number, title, state, base/head refs and OIDs, head repository owner/name (guarded against `vim.NIL` for deleted forks), merge base OID.
-- **Repo info**: owner and name, detected from `git remote get-url origin` or provided via URL argument.
+- **Repo info**: owner and name, detected from `git remote get-url origin` or provided via URL argument. Detection reverses matching Git `url.*.insteadOf` rules when the reported remote uses an SSH host alias.
 - **Changed files**: list of tables with path, additions, deletions, changeType.
 - **Diff range**: the resolved merge base is retained separately from the active
   diff base. `:GHReviewCommits` can move the active base to a PR commit and can

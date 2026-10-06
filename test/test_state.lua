@@ -4,6 +4,54 @@ local h = require("test.helpers")
 local fixtures = require("test.fixtures")
 local state = require("gh_review.state")
 
+-- Replace vim.system for the duration of one test while guaranteeing that a
+-- failed assertion cannot leak the mock into subsequent state tests.
+local function with_system(responses, fn)
+  local original_system = vim.system
+  local calls = {}
+  vim.system = function(command)
+    calls[#calls + 1] = command
+    local response = responses[#calls]
+    return { wait = function() return response end }
+  end
+  local ok, err = pcall(fn, calls)
+  vim.system = original_system
+  if not ok then error(err, 0) end
+end
+
+h.run_test("Repo detection accepts a direct GitHub SSH remote", function()
+  state.reset()
+  with_system({
+    { code = 0, stdout = "git@github.com:testowner/testrepo.git\n" },
+  }, function(calls)
+    h.assert_true(state.get_repo_info())
+    h.assert_equal("testowner", state.get_owner())
+    h.assert_equal("testrepo", state.get_name())
+    h.assert_equal(1, #calls, "direct GitHub remotes need no config lookup")
+  end)
+end)
+
+h.run_test("Repo detection reverses a Git insteadOf SSH alias", function()
+  state.reset()
+  with_system({
+    { code = 0, stdout = "git@github-gcai:Software-GCAI/gpex.git\n" },
+    {
+      code = 0,
+      stdout = table.concat({
+        "url.git@github-gcai:.insteadof\ngit@other.example:",
+        -- The more specific mapping must win, matching Git's rewrite rules.
+        "url.git@github-gcai:Software-GCAI/.insteadof\ngit@github.com:Software-GCAI/",
+        "",
+      }, "\0"),
+    },
+  }, function(calls)
+    h.assert_true(state.get_repo_info())
+    h.assert_equal("Software-GCAI", state.get_owner())
+    h.assert_equal("gpex", state.get_name())
+    h.assert_equal("git config --null --get-regexp ^url\\..*\\.insteadof$", table.concat(calls[2], " "))
+  end)
+end)
+
 h.run_test("SetPR populates all getters", function()
   state.reset()
   state.set_pr(fixtures.mock_pr_data())
