@@ -297,6 +297,26 @@ h.run_test("GetParticipants returns empty for no threads", function()
   h.assert_equal(0, #participants)
 end)
 
+h.run_test("Mention candidates combine collaborators and thread authors", function()
+  state.reset()
+  state.set_threads(fixtures.mock_thread_nodes())
+  state.set_collaborators({ "carol", "Alice" })
+
+  local candidates = state.get_mention_candidates()
+  h.assert_equal(3, #candidates)
+  h.assert_equal("Alice", candidates[1])
+  h.assert_equal("bob", candidates[2])
+  h.assert_equal("carol", candidates[3])
+end)
+
+h.run_test("Reset clears repository collaborators", function()
+  state.set_collaborators({ "carol" })
+  state.reset()
+
+  h.assert_equal(0, #state.get_collaborators())
+  h.assert_equal(0, #state.get_mention_candidates())
+end)
+
 h.run_test("Statusline returns empty when no PR loaded", function()
   state.reset()
   local gh = require("gh_review")

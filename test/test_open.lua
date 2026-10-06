@@ -92,6 +92,8 @@ h.run_test("Merge base uses immutable PR OIDs when branch refs are unavailable",
   local original_system = vim.system
   local system_commands = {}
   local compare_endpoint = ""
+  local collaborators_endpoint = ""
+  local collaborators_jq = ""
 
   state.reset()
   config.setup({ checkout = "never" })
@@ -108,6 +110,12 @@ h.run_test("Merge base uses immutable PR OIDs when branch refs are unavailable",
   end
   api.graphql = function(_, _, callback) callback(fixtures.mock_pr_data()) end
   api.run_async = function(command, callback)
+    if command[2] == "--paginate" then
+      collaborators_endpoint = command[5]
+      collaborators_jq = command[4]
+      callback("carol\n", "")
+      return
+    end
     compare_endpoint = command[2]
     callback(vim.json.encode({ merge_base_commit = { sha = "merge123" } }), "")
   end
@@ -127,7 +135,10 @@ h.run_test("Merge base uses immutable PR OIDs when branch refs are unavailable",
   h.assert_true(vim.deep_equal(
     { "git", "merge-base", "aaa111", "bbb222" }, system_commands[2]))
   h.assert_equal("/repos/testowner/testrepo/compare/aaa111...bbb222", compare_endpoint)
+  h.assert_equal("/repos/testowner/testrepo/collaborators?per_page=100", collaborators_endpoint)
+  h.assert_equal(".[].login", collaborators_jq)
   h.assert_equal("merge123", state.get_merge_base_oid())
+  h.assert_true(vim.tbl_contains(state.get_mention_candidates(), "carol"))
 end)
 
 h.write_results("/tmp/gh_review_test_open.txt")

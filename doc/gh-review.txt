@@ -329,9 +329,11 @@ comment rather than adding a reply.
                                               *gh-review-thread-completion*
 
 The thread buffer sets |’omnifunc’| to a function that completes
-`@`-mentions from thread participants.  Trigger with CTRL-X CTRL-O in
-insert mode.  The completion list includes all unique comment authors
-across all review threads.
+`@`-mentions from repository collaborators and thread participants.  Trigger
+with CTRL-X CTRL-O in insert mode.  The completion list includes all unique
+collaborators and comment authors across all review threads.  If GitHub does
+not permit the current account to list collaborators, comment authors remain
+available as a fallback.
 
 ==============================================================================
 8. Files Picker                                         *gh-review-files-list*

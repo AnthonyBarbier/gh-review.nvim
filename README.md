@@ -261,7 +261,7 @@ different reviewed file deletes the previous file's LEFT buffer.
 | `g-`     | Toggle 👎 on the comment under the cursor     |
 | `q`      | Close the thread buffer                       |
 | `Ctrl-Q` | Close the thread buffer (works in insert mode)|
-| `Ctrl-X Ctrl-O` | Complete `@`-mention from thread participants |
+| `Ctrl-X Ctrl-O` | Complete `@`-mention from repository collaborators and thread participants |
 
 ## Signs and virtual text
 

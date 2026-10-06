@@ -379,7 +379,7 @@ thread itself.
 
 #### @-mention completion
 
-The thread buffer sets `omnifunc` to a custom function that completes `@`-mentions from thread participants. `state.get_participants()` provides the candidate list. Users trigger completion with `Ctrl-X Ctrl-O` (standard Neovim omni-completion).
+The thread buffer sets `omnifunc` to a custom function that completes `@`-mentions from repository collaborators and thread participants. Collaborators are fetched asynchronously through GitHub's paginated REST endpoint so an access failure cannot block PR loading; `state.get_mention_candidates()` merges them with the comment authors returned by `state.get_participants()`. Users trigger completion with `Ctrl-X Ctrl-O` (standard Neovim omni-completion).
 
 #### Reactions
 

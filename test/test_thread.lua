@@ -490,13 +490,15 @@ h.run_test("Thread omnifunc: base filtering returns matching participants", func
   state.reset()
   state.set_pr(fixtures.mock_pr_data())
   state.set_threads(fixtures.mock_thread_nodes())
+  state.set_collaborators({ "carol" })
 
   local matches = thread.omnifunc(0, "al")
   h.assert_equal(1, #matches, "should match alice")
   h.assert_equal("alice", matches[1])
 
   local all = thread.omnifunc(0, "")
-  h.assert_equal(2, #all, "empty base should return all participants")
+  h.assert_equal(3, #all, "empty base should return collaborators and participants")
+  h.assert_equal("carol", all[3])
 end)
 
 h.run_test("Thread buffer: omnifunc is set", function()

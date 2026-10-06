@@ -10,6 +10,27 @@ local config = require("gh_review.config")
 
 local M = {}
 
+local function fetch_collaborators(owner, name)
+  local endpoint = string.format("/repos/%s/%s/collaborators?per_page=100", owner, name)
+  -- `--paginate` follows every Link header while `--jq` emits one login per
+  -- line, avoiding concatenated JSON documents for repositories with more
+  -- than 100 collaborators. This request is deliberately independent of PR
+  -- loading: some tokens can review a PR without permission to list a private
+  -- repository's collaborators, in which case thread authors remain usable.
+  api_mod.run_async({ "api", "--paginate", "--jq", ".[].login", endpoint }, function(stdout, stderr)
+    -- A previous repository's slower request must not replace the candidates
+    -- after the user has already opened another review.
+    if state.get_owner() ~= owner or state.get_name() ~= name then return end
+    if stderr and stderr ~= "" then return end
+
+    local logins = {}
+    for login in (stdout or ""):gmatch("[^\r\n]+") do
+      if login ~= "" then logins[#logins + 1] = login end
+    end
+    state.set_collaborators(logins)
+  end)
+end
+
 local function is_local_repo(owner, name)
   local obj = vim.system({ "git", "remote", "get-url", "origin" }, { text = true }):wait()
   if obj.code ~= 0 then return false end
@@ -167,6 +188,9 @@ function M.open(pr_number_str)
 
   local owner = state.get_owner()
   local name = state.get_name()
+  -- Do not expose collaborators cached for a previously opened repository
+  -- while the new PR and its repository-wide candidate list are loading.
+  state.set_collaborators({})
 
   local vars = {
     owner = owner,
@@ -184,6 +208,7 @@ function M.open(pr_number_str)
 
     local thread_nodes = ((pr.reviewThreads or {}).nodes or {})
     state.set_threads(thread_nodes)
+    fetch_collaborators(owner, name)
 
     local function load_ui()
       fetch_merge_base(function()

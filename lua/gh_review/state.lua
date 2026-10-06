@@ -50,6 +50,11 @@ local checked_files = {}
 -- Review threads indexed by id
 local threads = {}
 
+-- Repository collaborators are loaded separately from the PR GraphQL query.
+-- Keeping this cache independent prevents a permissions failure on GitHub's
+-- collaborators endpoint from making the review itself impossible to open.
+local collaborators = {}
+
 -- Pending review id (empty string if no active pending review)
 local pending_review_id = ""
 
@@ -191,6 +196,14 @@ function M.set_thread(id, data)
   threads[id] = data
 end
 
+function M.set_collaborators(logins)
+  collaborators = logins or {}
+end
+
+function M.get_collaborators()
+  return collaborators
+end
+
 function M.get_threads_for_file(path)
   local result = {}
   for _, t in pairs(threads) do
@@ -299,6 +312,27 @@ function M.get_participants()
   return result
 end
 
+-- Mention completion combines the repository-wide collaborator list with
+-- people already present in the review.  Thread authors remain available when
+-- the viewer lacks permission to enumerate collaborators, and deduplication is
+-- case-insensitive because GitHub logins themselves are case-insensitive.
+function M.get_mention_candidates()
+  local seen = {}
+  local result = {}
+  local function add(login)
+    if type(login) ~= "string" or login == "" then return end
+    local key = login:lower()
+    if seen[key] then return end
+    seen[key] = true
+    result[#result + 1] = login
+  end
+
+  for _, login in ipairs(collaborators) do add(login) end
+  for _, login in ipairs(M.get_participants()) do add(login) end
+  table.sort(result, function(a, b) return a:lower() < b:lower() end)
+  return result
+end
+
 -- ------- Reset -------
 
 function M.reset()
@@ -320,6 +354,7 @@ function M.reset()
   full_pr_files = {}
   checked_files = {}
   threads = {}
+  collaborators = {}
   pending_review_id = ""
   files_bufnr = -1
   left_bufnr = -1

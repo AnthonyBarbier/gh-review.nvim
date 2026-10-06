@@ -520,9 +520,9 @@ function M.omnifunc(findstart, base)
     end
     return -3
   end
-  local participants = state.get_participants()
+  local candidates = state.get_mention_candidates()
   local matches = {}
-  for _, p in ipairs(participants) do
+  for _, p in ipairs(candidates) do
     if p:lower():find(base:lower(), 1, true) == 1 then
       matches[#matches + 1] = p
     end
