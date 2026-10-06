@@ -397,13 +397,13 @@ function M.submit_review()
       end
     end
 
-    if event == "COMMENT" or event == "REQUEST_CHANGES" then
-      vim.ui.input({ prompt = "Review body (optional): " }, function(body)
-        do_submit(body or "")
-      end)
-    else
-      do_submit("")
-    end
+    -- GitHub accepts an overall body for every review event, including an
+    -- approval. An empty string intentionally submits without a body, while a
+    -- cancelled input must not accidentally submit the selected review event.
+    vim.ui.input({ prompt = "Review body (optional): " }, function(body)
+      if body == nil then return end
+      do_submit(body)
+    end)
   end)
 end
 

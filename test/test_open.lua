@@ -141,4 +141,63 @@ h.run_test("Merge base uses immutable PR OIDs when branch refs are unavailable",
   h.assert_true(vim.tbl_contains(state.get_mention_candidates(), "carol"))
 end)
 
+h.run_test("Approve prompts for and submits an overall review body", function()
+  local api = require("gh_review.api")
+  local graphql = require("gh_review.graphql")
+  local review = require("gh_review")
+  local state = require("gh_review.state")
+  local original_graphql = api.graphql
+  local original_select = vim.ui.select
+  local original_input = vim.ui.input
+  local captured = {}
+
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  vim.ui.select = function(_, _, callback) callback("Approve") end
+  vim.ui.input = function(opts, callback)
+    captured.prompt = opts.prompt
+    callback("Looks good to me")
+  end
+  api.graphql = function(query, vars)
+    captured.query = query
+    captured.vars = vars
+  end
+
+  review.submit_review()
+
+  api.graphql = original_graphql
+  vim.ui.select = original_select
+  vim.ui.input = original_input
+
+  h.assert_equal("Review body (optional): ", captured.prompt)
+  h.assert_equal(graphql.MUTATION_SUBMIT_REVIEW, captured.query)
+  h.assert_equal("pending_rev_1", captured.vars.reviewId)
+  h.assert_equal("APPROVE", captured.vars.event)
+  h.assert_equal("Looks good to me", captured.vars.body)
+end)
+
+h.run_test("Cancelling the overall review body does not submit", function()
+  local api = require("gh_review.api")
+  local review = require("gh_review")
+  local state = require("gh_review.state")
+  local original_graphql = api.graphql
+  local original_select = vim.ui.select
+  local original_input = vim.ui.input
+  local submitted = false
+
+  state.reset()
+  state.set_pr(fixtures.mock_pr_data())
+  vim.ui.select = function(_, _, callback) callback("Approve") end
+  vim.ui.input = function(_, callback) callback(nil) end
+  api.graphql = function() submitted = true end
+
+  review.submit_review()
+
+  api.graphql = original_graphql
+  vim.ui.select = original_select
+  vim.ui.input = original_input
+
+  h.assert_false(submitted, "cancelling the body prompt should cancel approval")
+end)
+
 h.write_results("/tmp/gh_review_test_open.txt")
